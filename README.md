@@ -122,5 +122,5 @@ Theming System: Dynamic theming is implemented using CSS variables and Tailwind 
 
 Component Architecture: Modular component design for maintainability and reusability.
 
-Conclusion
+##Conclusion
 The Transformers Timer is not just an app; it's your mission control for time management. Like the Autobots, it helps you conquer challenges and emerge victorious. Whether working, studying, or just trying to stay on track, this timer ensures you're always in control. So, install it, transform your productivity, and let the sound of success guide you! 🚀
