@@ -1,3 +1,21 @@
+/**
+ * Timer Component
+ * 
+ * This is the main timer interface of the application, providing both a classic and
+ * transforming timer display. It integrates with the TimerContext to manage timer state
+ * and provides controls for starting, pausing, and resetting the timer, as well as
+ * switching between different timer presets.
+ * 
+ * Features:
+ * - Dual timer interfaces (Classic and Transforming)
+ * - Faction-themed styling with dynamic colors
+ * - Transformation animations that occur during focus sessions
+ * - Battle power meter that increases during focus sessions
+ * - Ambient mode for distraction-free viewing
+ * - Victory celebrations when timers complete
+ * - Random motivational quotes from Transformers characters
+ */
+
 import { useNavigate } from 'react-router-dom';
 import { useTimer } from '../context/TimerContext';
 import { CircularProgress } from './ui/circular-progress';
@@ -7,20 +25,34 @@ import TransformingTimer from './TransformingTimer';
 import AmbientMode from './AmbientMode';
 import { BarChart2, Settings as SettingsIcon } from 'lucide-react';
 
+/**
+ * Timer Component
+ * 
+ * The main timer interface that provides functionality for focus and break sessions
+ * with Transformers-themed visuals and interactions.
+ * 
+ * @returns {JSX.Element} The rendered Timer component
+ */
 export default function Timer() {
   const navigate = useNavigate();
   const { state, startTimer, pauseTimer, resetTimer, switchPreset } = useTimer();
   const { activePreset, presets, isRunning, timeRemaining, isComplete, preferences } = state;
+  
+  // State for visual and interactive elements
   const [transformState, setTransformState] = useState<'robot' | 'vehicle'>('robot');
   const [battlePower, setBattlePower] = useState(0);
   const [showVictory, setShowVictory] = useState(false);
-  // Using currentQuote for displaying quotes during timer sessions
   const [currentQuote, setCurrentQuote] = useState('Till all are one!');
   const [useNewTimerInterface, setUseNewTimerInterface] = useState(true);
   const [ambientModeActive, setAmbientModeActive] = useState(false);
   const [idleTime, setIdleTime] = useState(0);
 
-  // Transform every 30 seconds while running
+  /**
+   * Effect: Transform animation
+   * 
+   * Toggles between robot and vehicle mode every 30 seconds while the timer is running,
+   * playing a transformation sound effect when the change occurs.
+   */
   useEffect(() => {
     if (!isRunning) return;
     
@@ -33,7 +65,12 @@ export default function Timer() {
     return () => clearInterval(interval);
   }, [isRunning, preferences.faction]);
 
-  // Update battle power while timer is running
+  /**
+   * Effect: Battle power progression
+   * 
+   * Increases the battle power meter by 5% every minute during focus sessions,
+   * up to a maximum of 100%.
+   */
   useEffect(() => {
     if (isRunning && activePreset.id === 'focus') {
       const interval = setInterval(() => {
@@ -44,7 +81,14 @@ export default function Timer() {
     }
   }, [isRunning, activePreset.id]);
 
-  // Handle timer completion
+  /**
+   * Effect: Timer completion handler
+   * 
+   * Manages what happens when a timer completes:
+   * - Shows a victory celebration animation
+   * - Resets battle power after focus sessions
+   * - Updates the motivational quote
+   */
   useEffect(() => {
     if (timeRemaining === 0 && !isRunning) {
       // Show victory celebration
@@ -68,7 +112,12 @@ export default function Timer() {
     }
   }, [timeRemaining, isRunning, activePreset.id]);
 
-  // Track idle time for ambient mode
+  /**
+   * Effect: Idle time tracking
+   * 
+   * Tracks user inactivity and automatically activates ambient mode
+   * after 2 minutes of no interaction.
+   */
   useEffect(() => {
     if (ambientModeActive) return;
 
@@ -98,7 +147,12 @@ export default function Timer() {
     };
   }, [idleTime, ambientModeActive]);
 
-  // Exit ambient mode on user activity
+  /**
+   * Effect: Ambient mode exit handler
+   * 
+   * Exits ambient mode when the user interacts with the page
+   * through mouse movement, keyboard input, or clicks.
+   */
   useEffect(() => {
     if (!ambientModeActive) return;
     
@@ -115,19 +169,32 @@ export default function Timer() {
     };
   }, [ambientModeActive]);
 
-  // Format time as MM:SS
+  /**
+   * Formats time in seconds to MM:SS display format
+   * 
+   * @param {number} seconds - Time in seconds
+   * @returns {string} Formatted time string (MM:SS)
+   */
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Calculate progress percentage
+  /**
+   * Calculates the progress percentage for the timer
+   * Used for circular progress display
+   */
   const progress = activePreset.duration > 0 
     ? ((activePreset.duration * 60) - timeRemaining) / (activePreset.duration * 60) * 100
     : 0;
 
-  // Get progress color based on faction
+  /**
+   * Gets the appropriate color based on the selected faction
+   * Used for theming UI elements
+   * 
+   * @returns {string} Hex color code for the selected faction
+   */
   const getFactionColor = () => {
     switch (preferences.faction) {
       case 'autobots':
@@ -143,7 +210,12 @@ export default function Timer() {
     }
   };
 
-  // Create preset objects for switchPreset calls
+  /**
+   * Handles switching between timer presets
+   * Creates the appropriate preset object and calls the context's switchPreset function
+   * 
+   * @param {string} presetId - ID of the preset to switch to
+   */
   const handleSwitchPreset = (presetId: string) => {
     const presetDurations = {
       focus: presets.focus,

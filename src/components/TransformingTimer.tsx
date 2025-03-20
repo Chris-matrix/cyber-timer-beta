@@ -1,7 +1,30 @@
+/**
+ * Transformers Timer - Animated Timer Component
+ * 
+ * This component is the visual centerpiece of the application, displaying an animated
+ * timer that transforms between different shapes based on timer progress. It creates
+ * a visually engaging experience inspired by the Transformers universe.
+ * 
+ * Key features:
+ * - Shape transformation at key progress points (25%, 50%, 75%, 100%)
+ * - Faction-specific colors and styling
+ * - Dynamic animations during transformations
+ * - Rotation and pulse effects
+ * - Character quotes during transformations
+ */
+
 import { useState, useEffect } from 'react';
 import { useTimer } from '../context/TimerContext';
 import { playNotificationSound } from '../lib/audio';
 
+/**
+ * Props for the TransformingTimer component
+ * @property {number} timeRemaining - Seconds remaining in the current timer
+ * @property {number} totalTime - Total seconds for the timer
+ * @property {boolean} isRunning - Whether the timer is currently running
+ * @property {boolean} isComplete - Whether the timer has completed
+ * @property {string} activePreset - Current timer preset (e.g., 'focus', 'break')
+ */
 interface TransformingTimerProps {
   timeRemaining: number;
   totalTime: number;
@@ -18,13 +41,33 @@ export default function TransformingTimer({
   activePreset
 }: TransformingTimerProps) {
   const { state } = useTimer();
+  
+  /**
+   * State for the current shape of the timer
+   * Transforms between: circle → square → diamond → shield → star
+   */
   const [shape, setShape] = useState<'circle' | 'square' | 'diamond' | 'shield' | 'star'>('circle');
+  
+  /** State to track if the timer is currently transforming between shapes */
   const [isTransforming, setIsTransforming] = useState(false);
+  
+  /** State for the current rotation angle of the timer (0-360 degrees) */
   const [rotation, setRotation] = useState(0);
+  
+  /** State to track if the energy pulse effect should be shown */
   const [pulseEffect, setPulseEffect] = useState(false);
+  
+  /** 
+   * Counter for transformation animations
+   * Used to cycle between different animation styles
+   */
   const [transformationCount, setTransformationCount] = useState(0);
   
-  // Get faction color
+  /**
+   * Gets the primary color based on the selected faction
+   * This color is used for the progress ring and other primary UI elements
+   * @returns {string} Hex color code for the faction
+   */
   const getFactionColor = () => {
     switch (state.preferences.faction) {
       case 'autobots':
@@ -40,7 +83,11 @@ export default function TransformingTimer({
     }
   };
 
-  // Get secondary faction color for highlights and accents
+  /**
+   * Gets the secondary color based on the selected faction
+   * This color is used for borders, highlights, and accents
+   * @returns {string} Hex color code for the faction's secondary color
+   */
   const getSecondaryFactionColor = () => {
     switch (state.preferences.faction) {
       case 'autobots':
@@ -56,10 +103,23 @@ export default function TransformingTimer({
     }
   };
 
-  // Calculate progress percentage
+  /**
+   * Calculate the progress percentage for the timer
+   * Used for the progress ring and to trigger transformations
+   */
   const progress = Math.max(0, Math.min(100, (1 - timeRemaining / totalTime) * 100));
   
-  // Transform shape based on timer state and progress
+  /**
+   * Effect hook to handle shape transformations based on timer progress
+   * 
+   * Transforms occur at specific progress points:
+   * - 25%: Circle → Square
+   * - 50%: Square → Diamond
+   * - 75%: Diamond → Shield
+   * - 100%: Shield → Star
+   * 
+   * Also handles special cases for timer reset, completion, and break timers
+   */
   useEffect(() => {
     // Transform shape at specific progress points
     if (isRunning && !isComplete) {
@@ -92,7 +152,10 @@ export default function TransformingTimer({
     }
   }, [progress, isRunning, isComplete, activePreset, shape]);
   
-  // Rotate timer slightly when running
+  /**
+   * Effect hook to handle timer rotation animation
+   * Creates a continuous rotation effect while the timer is running
+   */
   useEffect(() => {
     if (isRunning && !isComplete) {
       const interval = setInterval(() => {
@@ -105,7 +168,10 @@ export default function TransformingTimer({
     }
   }, [isRunning, isComplete]);
   
-  // Add pulse effect every 5 minutes during focus
+  /**
+   * Effect hook to add pulse effects at regular intervals
+   * Creates an energy pulse effect every 5 minutes during focus sessions
+   */
   useEffect(() => {
     if (isRunning && !isComplete && activePreset.includes('focus')) {
       const pulseInterval = setInterval(() => {
@@ -119,7 +185,11 @@ export default function TransformingTimer({
     }
   }, [isRunning, isComplete, timeRemaining, activePreset]);
   
-  // Function to handle shape transformation with animation
+  /**
+   * Handles the transformation between shapes with animation and sound effects
+   * 
+   * @param {string} newShape - The shape to transform into
+   */
   const transformShape = (newShape: 'circle' | 'square' | 'diamond' | 'shield' | 'star') => {
     if (shape === newShape) return;
     
@@ -142,14 +212,24 @@ export default function TransformingTimer({
     }, 500);
   };
   
-  // Format time remaining as MM:SS
+  /**
+   * Formats the time remaining as MM:SS
+   * 
+   * @param {number} seconds - Time in seconds
+   * @returns {string} Formatted time string (MM:SS)
+   */
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Get shape styles based on current shape
+  /**
+   * Generates the CSS styles for the current shape
+   * Each shape has specific border radius, transform, and other style properties
+   * 
+   * @returns {Object} Style object for the current shape
+   */
   const getShapeStyles = () => {
     const baseStyles = {
       width: '300px',
@@ -208,7 +288,7 @@ export default function TransformingTimer({
       justifyContent: 'center',
       padding: '2rem'
     }}>
-      {/* Transforming container */}
+      {/* Transforming container - Main timer shape that changes based on progress */}
       <div
         style={{
           ...getShapeStyles(),
@@ -219,7 +299,7 @@ export default function TransformingTimer({
               : 'none'
         }}
       >
-        {/* Progress ring */}
+        {/* Progress ring - Visual indicator of timer progress using conic gradient */}
         <div style={{
           position: 'absolute',
           top: '10px',
@@ -239,7 +319,7 @@ export default function TransformingTimer({
           transform: shape === 'diamond' ? 'rotate(0deg)' : 'none'
         }} />
         
-        {/* Inner circle */}
+        {/* Inner circle - Contains timer display and preset name */}
         <div style={{
           position: 'absolute',
           top: '30px',
@@ -260,7 +340,7 @@ export default function TransformingTimer({
           transform: shape === 'diamond' ? 'rotate(0deg)' : 'none',
           border: `2px solid ${getSecondaryFactionColor()}`
         }}>
-          {/* Time display */}
+          {/* Time display - Shows remaining time in MM:SS format */}
           <div style={{
             fontSize: '3rem',
             fontWeight: 'bold',
@@ -271,7 +351,7 @@ export default function TransformingTimer({
             {formatTime(timeRemaining)}
           </div>
           
-          {/* Preset name */}
+          {/* Preset name - Shows the current timer preset (focus, break, etc.) */}
           <div style={{
             fontSize: '1.25rem',
             color: getFactionColor(),
@@ -281,7 +361,7 @@ export default function TransformingTimer({
             {activePreset}
           </div>
           
-          {/* Faction emblem */}
+          {/* Faction emblem - Background watermark of the selected faction logo */}
           <div style={{
             position: 'absolute',
             top: '50%',
@@ -299,7 +379,7 @@ export default function TransformingTimer({
         </div>
       </div>
       
-      {/* Character quote during transformation */}
+      {/* Character quote - Displays faction-specific quote during transformations */}
       {isTransforming && (
         <div style={{
           marginTop: '2rem',
@@ -324,15 +404,17 @@ export default function TransformingTimer({
         </div>
       )}
       
-      {/* CSS Animations */}
+      {/* CSS Animations - Keyframe animations for transformations and effects */}
       <style>
         {`
+          /* Rotation and scale animation - Variation 1 */
           @keyframes transform-pulse-0 {
             0% { transform: scale(1) rotate(${rotation}deg); }
             50% { transform: scale(1.2) rotate(${rotation + 180}deg); }
             100% { transform: scale(1) rotate(${rotation + 360}deg); }
           }
           
+          /* Rotation and scale animation - Variation 2 */
           @keyframes transform-pulse-1 {
             0% { transform: scale(1) rotate(${rotation}deg); }
             25% { transform: scale(0.8) rotate(${rotation + 90}deg); }
@@ -341,6 +423,7 @@ export default function TransformingTimer({
             100% { transform: scale(1) rotate(${rotation + 360}deg); }
           }
           
+          /* Rotation, scale, and opacity animation - Variation 3 */
           @keyframes transform-pulse-2 {
             0% { transform: scale(1) rotate(${rotation}deg); opacity: 1; }
             25% { transform: scale(1.1) rotate(${rotation + 90}deg); opacity: 0.8; }
@@ -349,12 +432,14 @@ export default function TransformingTimer({
             100% { transform: scale(1) rotate(${rotation + 360}deg); opacity: 1; }
           }
           
+          /* Glow pulse animation for energy effect */
           @keyframes energy-pulse {
             0% { box-shadow: 0 0 30px ${getFactionColor()}80; }
             50% { box-shadow: 0 0 50px ${getFactionColor()}; }
             100% { box-shadow: 0 0 30px ${getFactionColor()}80; }
           }
           
+          /* Fade in and out animation for quotes */
           @keyframes fade-in-out {
             0% { opacity: 0; transform: translateY(20px); }
             20% { opacity: 1; transform: translateY(0); }
