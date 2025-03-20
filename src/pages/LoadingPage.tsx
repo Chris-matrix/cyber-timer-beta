@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTimer } from '../context/TimerContext';
 import { playNotificationSound } from '../lib/audio';
+import { useNotification } from '../components/ui/notification';
 
 // Define faction data
 const factionData = {
@@ -58,14 +59,34 @@ const factionData = {
 // Define faction types
 type FactionType = 'autobots' | 'decepticons' | 'maximals' | 'predacons';
 
-export default function LoadingPage() {
+interface LoadingPageProps {
+  onFactionSelected?: () => void;
+}
+
+export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
   const navigate = useNavigate();
   const { state, updatePreference } = useTimer();
+  const { showNotification } = useNotification();
   const [selectedFaction, setSelectedFaction] = useState<FactionType>(state.preferences.faction as FactionType || 'autobots');
   const [selectedCharacter, setSelectedCharacter] = useState<string>(state.preferences.character || 'optimus');
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [currentQuote, setCurrentQuote] = useState('');
+  const [hasSelectedBefore, setHasSelectedBefore] = useState(false);
+
+  // Check if user has already selected a faction and should skip loading screen
+  useEffect(() => {
+    if (state.preferences.faction && state.preferences.character) {
+      setHasSelectedBefore(true);
+      setSelectedFaction(state.preferences.faction as FactionType);
+      setSelectedCharacter(state.preferences.character);
+      
+      // If user is returning to the loading page but already has a faction, redirect to timer
+      if (window.location.pathname === '/loading' && !isLoading) {
+        navigate('/timer');
+      }
+    }
+  }, [state.preferences.faction, state.preferences.character, navigate, isLoading]);
 
   // Handle faction selection
   const handleFactionSelect = (faction: FactionType) => {
@@ -113,6 +134,19 @@ export default function LoadingPage() {
         progress = 100;
         clearInterval(interval);
         
+        // Show welcome notification
+        showNotification({
+          title: 'Welcome to Transformers Timer',
+          message: `You've joined the ${factionData[selectedFaction].name}. Ready to focus!`,
+          type: 'success',
+          duration: 60000 // 1 minute
+        });
+        
+        // Notify parent component that faction has been selected
+        if (onFactionSelected) {
+          onFactionSelected();
+        }
+        
         // Navigate to timer after a short delay
         setTimeout(() => {
           navigate('/timer');
@@ -121,21 +155,6 @@ export default function LoadingPage() {
       setLoadingProgress(progress);
     }, 300);
   };
-
-  // Effect to check if we should skip the loading page
-  useEffect(() => {
-    // If faction and character are already set, skip to timer
-    if (state.preferences.faction && state.preferences.character && !isLoading) {
-      setSelectedFaction(state.preferences.faction as FactionType);
-      setSelectedCharacter(state.preferences.character);
-      
-      // Auto-navigate to timer if preferences are already set
-      // and user is coming back to the loading page
-      if (window.location.pathname === '/loading') {
-        navigate('/timer');
-      }
-    }
-  }, [state.preferences.faction, state.preferences.character, isLoading, navigate]);
 
   return (
     <div style={{

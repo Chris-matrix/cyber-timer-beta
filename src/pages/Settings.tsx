@@ -25,12 +25,71 @@ const factions = [
   { id: 'decepticons', name: 'Decepticons', description: 'Conquerors of worlds' },
 ] as const;
 
+const achievementsData = [
+  {
+    id: 'first_focus',
+    title: 'First Focus',
+    description: 'Complete your first focus session',
+    icon: '🎯',
+    requirement: 1, // Number of focus sessions
+    reward: 'Unlock basic customization',
+  },
+  {
+    id: 'focus_streak',
+    title: 'Focus Streak',
+    description: 'Complete 3 focus sessions in a row',
+    icon: '🔥',
+    requirement: 3, // Consecutive focus sessions
+    reward: 'Unlock advanced timer animations',
+  },
+  {
+    id: 'time_master',
+    title: 'Time Master',
+    description: 'Complete a total of 10 hours of focus time',
+    icon: '⏰',
+    requirement: 600, // Minutes of focus
+    reward: 'Unlock special faction quotes',
+  },
+  {
+    id: 'energon_collector',
+    title: 'Energon Collector',
+    description: 'Collect 1000 energon points',
+    icon: '💎',
+    requirement: 1000, // Energon points
+    reward: 'Unlock special character',
+  },
+  {
+    id: 'allspark_finder',
+    title: 'Allspark Finder',
+    description: 'Find the hidden Allspark by completing 50 focus sessions',
+    icon: '✨',
+    requirement: 50, // Focus sessions
+    reward: 'Unlock Allspark theme',
+  },
+  {
+    id: 'cybertron_elite',
+    title: 'Cybertron Elite',
+    description: 'Reach a battle power of 100 in a single focus session',
+    icon: '🏆',
+    requirement: 100, // Battle power
+    reward: 'Unlock elite faction emblem',
+  },
+  {
+    id: 'balanced_transformer',
+    title: 'Balanced Transformer',
+    description: 'Complete 20 focus sessions and 20 break sessions',
+    icon: '⚖️',
+    requirement: 20, // Both types of sessions
+    reward: 'Unlock balanced mode',
+  }
+];
+
 export default function Settings() {
   const navigate = useNavigate();
   const { state, updatePreset, resetStats, updatePreference } = useTimer();
   const [focusDuration, setFocusDuration] = React.useState(state.presets.focus);
   const [breakDuration, setBreakDuration] = React.useState(state.presets.break);
-  const [activeTab, setActiveTab] = React.useState<'general' | 'transformers'>('general');
+  const [activeTab, setActiveTab] = React.useState<'general' | 'transformers' | 'achievements'>('general');
 
   // Get theme color based on faction
   const getThemeColor = () => {
@@ -67,6 +126,42 @@ export default function Settings() {
 
   const handleCharacterChange = (character: 'optimus' | 'bumblebee' | 'megatron' | 'starscream') => {
     updatePreference('character', character);
+  };
+
+  const calculateAchievementProgress = (achievementId: string) => {
+    const stats = state.stats;
+    
+    switch (achievementId) {
+      case 'first_focus':
+        return Math.min(stats.totalFocusSessions, 1);
+      case 'focus_streak':
+        return Math.min(stats.currentStreak, 3);
+      case 'time_master':
+        return Math.min(stats.totalFocusMinutes, 600);
+      case 'energon_collector':
+        return Math.min(stats.energonPoints || 0, 1000);
+      case 'allspark_finder':
+        return Math.min(stats.totalFocusSessions, 50);
+      case 'cybertron_elite':
+        return Math.min(stats.highestBattlePower || 0, 100);
+      case 'balanced_transformer':
+        return Math.min(
+          Math.min(stats.totalFocusSessions, 20) + 
+          Math.min(stats.totalBreakSessions, 20), 
+          40
+        ) / 2; // Average of both progress values
+      default:
+        return 0;
+    }
+  };
+  
+  const isAchievementCompleted = (achievementId: string) => {
+    const progress = calculateAchievementProgress(achievementId);
+    const achievement = achievementsData.find(a => a.id === achievementId);
+    
+    if (!achievement) return false;
+    
+    return progress >= achievement.requirement;
   };
 
   return (
@@ -139,6 +234,21 @@ export default function Settings() {
           }}
         >
           Transformers
+        </button>
+        <button 
+          onClick={() => setActiveTab('achievements')}
+          style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: 'transparent',
+            color: activeTab === 'achievements' ? getThemeColor() : 'white',
+            border: 'none',
+            borderBottom: activeTab === 'achievements' ? `2px solid ${getThemeColor()}` : 'none',
+            marginBottom: activeTab === 'achievements' ? '-1px' : '0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'achievements' ? 'bold' : 'normal'
+          }}
+        >
+          Achievements
         </button>
       </div>
 
@@ -372,6 +482,120 @@ export default function Settings() {
                 Complete 10 focus sessions to earn a piece of the Matrix of Leadership
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Achievements Tab */}
+      {activeTab === 'achievements' && (
+        <div>
+          <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem' }}>Achievements</h2>
+          
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', 
+            gap: '1.5rem' 
+          }}>
+            {achievementsData.map(achievement => {
+              const progress = calculateAchievementProgress(achievement.id);
+              const isCompleted = isAchievementCompleted(achievement.id);
+              
+              return (
+                <div 
+                  key={achievement.id}
+                  style={{
+                    backgroundColor: '#1a1a1a',
+                    borderRadius: '0.5rem',
+                    padding: '1.5rem',
+                    border: isCompleted 
+                      ? `2px solid ${getThemeColor()}` 
+                      : '2px solid #333',
+                    position: 'relative',
+                    overflow: 'hidden'
+                  }}
+                >
+                  {isCompleted && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '0.5rem',
+                      right: '0.5rem',
+                      backgroundColor: getThemeColor(),
+                      color: 'white',
+                      borderRadius: '9999px',
+                      padding: '0.25rem 0.5rem',
+                      fontSize: '0.75rem',
+                      fontWeight: 'bold'
+                    }}>
+                      Completed
+                    </div>
+                  )}
+                  
+                  <div style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    marginBottom: '1rem',
+                    gap: '0.75rem'
+                  }}>
+                    <div style={{
+                      fontSize: '2rem',
+                      opacity: isCompleted ? 1 : 0.5
+                    }}>
+                      {achievement.icon}
+                    </div>
+                    <div>
+                      <h3 style={{ 
+                        fontSize: '1.25rem', 
+                        marginBottom: '0.25rem',
+                        color: isCompleted ? getThemeColor() : 'white'
+                      }}>
+                        {achievement.title}
+                      </h3>
+                      <p style={{ fontSize: '0.875rem', opacity: 0.7 }}>
+                        {achievement.description}
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginBottom: '1rem' }}>
+                    <div style={{ 
+                      width: '100%',
+                      height: '8px',
+                      backgroundColor: '#2a2a2a',
+                      borderRadius: '9999px',
+                      overflow: 'hidden',
+                      marginBottom: '0.5rem'
+                    }}>
+                      <div
+                        style={{
+                          height: '100%',
+                          width: `${(progress / achievement.requirement) * 100}%`,
+                          backgroundColor: isCompleted ? getThemeColor() : '#666',
+                          transition: 'width 0.3s ease'
+                        }}
+                      />
+                    </div>
+                    <div style={{ 
+                      display: 'flex', 
+                      justifyContent: 'space-between',
+                      fontSize: '0.75rem',
+                      opacity: 0.7
+                    }}>
+                      <span>Progress</span>
+                      <span>{progress} / {achievement.requirement}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={{
+                    backgroundColor: '#2a2a2a',
+                    borderRadius: '0.375rem',
+                    padding: '0.75rem',
+                    fontSize: '0.875rem'
+                  }}>
+                    <strong>Reward:</strong> {achievement.reward}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

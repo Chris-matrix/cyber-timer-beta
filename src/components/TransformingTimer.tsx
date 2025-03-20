@@ -21,6 +21,8 @@ export default function TransformingTimer({
   const [shape, setShape] = useState<'circle' | 'square' | 'diamond' | 'shield' | 'star'>('circle');
   const [isTransforming, setIsTransforming] = useState(false);
   const [rotation, setRotation] = useState(0);
+  const [pulseEffect, setPulseEffect] = useState(false);
+  const [transformationCount, setTransformationCount] = useState(0);
   
   // Get faction color
   const getFactionColor = () => {
@@ -103,11 +105,26 @@ export default function TransformingTimer({
     }
   }, [isRunning, isComplete]);
   
+  // Add pulse effect every 5 minutes during focus
+  useEffect(() => {
+    if (isRunning && !isComplete && activePreset.includes('focus')) {
+      const pulseInterval = setInterval(() => {
+        if (timeRemaining % 300 === 0 && timeRemaining > 0) {
+          setPulseEffect(true);
+          setTimeout(() => setPulseEffect(false), 2000);
+        }
+      }, 1000);
+      
+      return () => clearInterval(pulseInterval);
+    }
+  }, [isRunning, isComplete, timeRemaining, activePreset]);
+  
   // Function to handle shape transformation with animation
   const transformShape = (newShape: 'circle' | 'square' | 'diamond' | 'shield' | 'star') => {
     if (shape === newShape) return;
     
     setIsTransforming(true);
+    setTransformationCount(prev => prev + 1);
     
     // Play transformation sound
     if (state.preferences.soundEnabled) {
@@ -141,7 +158,7 @@ export default function TransformingTimer({
       alignItems: 'center',
       justifyContent: 'center',
       position: 'relative' as const,
-      transition: 'all 0.5s ease',
+      transition: 'all 0.5s cubic-bezier(0.68, -0.55, 0.27, 1.55)',
       transform: `rotate(${rotation}deg)`,
       backgroundColor: '#1a1a1a',
       boxShadow: `0 0 30px ${getFactionColor()}80`
@@ -195,7 +212,11 @@ export default function TransformingTimer({
       <div
         style={{
           ...getShapeStyles(),
-          animation: isTransforming ? 'transform-pulse 1s ease' : 'none'
+          animation: isTransforming 
+            ? `transform-pulse-${transformationCount % 3} 1s cubic-bezier(0.68, -0.55, 0.27, 1.55)` 
+            : pulseEffect 
+              ? 'energy-pulse 2s ease' 
+              : 'none'
         }}
       >
         {/* Progress ring */}
@@ -306,10 +327,32 @@ export default function TransformingTimer({
       {/* CSS Animations */}
       <style>
         {`
-          @keyframes transform-pulse {
+          @keyframes transform-pulse-0 {
             0% { transform: scale(1) rotate(${rotation}deg); }
             50% { transform: scale(1.2) rotate(${rotation + 180}deg); }
             100% { transform: scale(1) rotate(${rotation + 360}deg); }
+          }
+          
+          @keyframes transform-pulse-1 {
+            0% { transform: scale(1) rotate(${rotation}deg); }
+            25% { transform: scale(0.8) rotate(${rotation + 90}deg); }
+            50% { transform: scale(1.2) rotate(${rotation + 180}deg); }
+            75% { transform: scale(0.9) rotate(${rotation + 270}deg); }
+            100% { transform: scale(1) rotate(${rotation + 360}deg); }
+          }
+          
+          @keyframes transform-pulse-2 {
+            0% { transform: scale(1) rotate(${rotation}deg); opacity: 1; }
+            25% { transform: scale(1.1) rotate(${rotation + 90}deg); opacity: 0.8; }
+            50% { transform: scale(0.9) rotate(${rotation + 180}deg); opacity: 1; }
+            75% { transform: scale(1.2) rotate(${rotation + 270}deg); opacity: 0.9; }
+            100% { transform: scale(1) rotate(${rotation + 360}deg); opacity: 1; }
+          }
+          
+          @keyframes energy-pulse {
+            0% { box-shadow: 0 0 30px ${getFactionColor()}80; }
+            50% { box-shadow: 0 0 50px ${getFactionColor()}; }
+            100% { box-shadow: 0 0 30px ${getFactionColor()}80; }
           }
           
           @keyframes fade-in-out {
