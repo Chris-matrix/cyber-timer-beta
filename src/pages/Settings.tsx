@@ -1,7 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
-import { Timer, Flower2, BarChart2 } from 'lucide-react';
+import { Timer, Flower2, BarChart2, ChevronLeft, Settings as SettingsIcon, Volume2, VolumeX } from '../components/ui/icons';
 import { useTimer } from '../context/TimerContext';
 
 type PreferenceKey = 'youtubeUrl' | 'soundEnabled' | 'faction' | 'character';
@@ -28,245 +28,373 @@ const factions = [
 export default function Settings() {
   const navigate = useNavigate();
   const { state, updatePreset, resetStats, updatePreference } = useTimer();
-  const [focusDuration, setFocusDuration] = React.useState(state.presets.focus / 60);
-  const [breakDuration, setBreakDuration] = React.useState(state.presets.break / 60);
-  const [youtubeUrl, setYoutubeUrl] = React.useState(state.preferences.youtubeUrl || '');
+  const [focusDuration, setFocusDuration] = React.useState(state.presets.focus);
+  const [breakDuration, setBreakDuration] = React.useState(state.presets.break);
+  const [activeTab, setActiveTab] = React.useState<'general' | 'transformers'>('general');
 
-  const handleFocusChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value);
-    if (!isNaN(value) && value > 0) {
-      setFocusDuration(value);
-      updatePreset('focus', value * 60);
+  // Get theme color based on faction
+  const getThemeColor = () => {
+    const colors: Record<string, string> = {
+      autobots: '#3b82f6', // Blue
+      decepticons: '#9333ea', // Purple
+      allspark: '#eab308', // Gold
+      dark: '#3b82f6', // Default to blue
+    };
+    return colors[state.preferences.theme] || colors.dark;
+  };
+
+  const handleSave = () => {
+    updatePreset('focus', focusDuration);
+    updatePreset('break', breakDuration);
+    navigate('/');
+  };
+
+  const handleReset = () => {
+    if (window.confirm('Are you sure you want to reset all statistics? This cannot be undone.')) {
+      resetStats();
     }
   };
 
-  const handleBreakChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(event.target.value);
-    if (!isNaN(value) && value > 0) {
-      setBreakDuration(value);
-      updatePreset('break', value * 60);
-    }
-  };
-
-  const handleSoundToggle = () => {
+  const handleToggleSound = () => {
     updatePreference('soundEnabled', !state.preferences.soundEnabled);
   };
 
-  const handleYoutubeUrlChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const url = event.target.value;
-    setYoutubeUrl(url);
-    updatePreference('youtubeUrl', url);
+  const handleFactionChange = (faction: 'autobots' | 'decepticons') => {
+    updatePreference('faction', faction);
+    // Update theme to match faction
+    updatePreference('theme', faction);
   };
 
-  const handlePreferenceChange = (key: PreferenceKey, value: any) => {
-    updatePreference(key, value);
-  };
-
-  const handlePresetChange = (key: PresetKey, value: number) => {
-    updatePreset(key, value);
+  const handleCharacterChange = (character: 'optimus' | 'bumblebee' | 'megatron' | 'starscream') => {
+    updatePreference('character', character);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-950 to-slate-900 text-white">
-      <nav className="fixed top-0 left-0 right-0 border-b border-white/10 bg-black/40 backdrop-blur-lg z-50">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
-            <h1 className="text-lg font-semibold">
-              {state.preferences.faction === 'autobots' ? 'Autobots' : 'Decepticons'} Timer
-            </h1>
-            <div className="flex items-center gap-3">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => navigate('/')}
+    <div style={{ 
+      backgroundColor: '#1a1a1a', 
+      color: 'white',
+      minHeight: '100vh',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '2rem'
+    }}>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center',
+        marginBottom: '2rem'
+      }}>
+        <button 
+          onClick={() => navigate('/')}
+          style={{
+            backgroundColor: 'transparent',
+            color: 'white',
+            border: 'none',
+            borderRadius: '9999px',
+            width: '2.5rem',
+            height: '2.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: '1rem',
+            cursor: 'pointer'
+          }}
+        >
+          <ChevronLeft />
+        </button>
+        <h1 style={{ fontSize: '1.5rem', fontWeight: 'bold' }}>Settings</h1>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ 
+        display: 'flex', 
+        borderBottom: '1px solid #333',
+        marginBottom: '1.5rem'
+      }}>
+        <button 
+          onClick={() => setActiveTab('general')}
+          style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: 'transparent',
+            color: activeTab === 'general' ? getThemeColor() : 'white',
+            border: 'none',
+            borderBottom: activeTab === 'general' ? `2px solid ${getThemeColor()}` : 'none',
+            marginBottom: activeTab === 'general' ? '-1px' : '0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'general' ? 'bold' : 'normal'
+          }}
+        >
+          General
+        </button>
+        <button 
+          onClick={() => setActiveTab('transformers')}
+          style={{
+            padding: '0.75rem 1rem',
+            backgroundColor: 'transparent',
+            color: activeTab === 'transformers' ? getThemeColor() : 'white',
+            border: 'none',
+            borderBottom: activeTab === 'transformers' ? `2px solid ${getThemeColor()}` : 'none',
+            marginBottom: activeTab === 'transformers' ? '-1px' : '0',
+            cursor: 'pointer',
+            fontWeight: activeTab === 'transformers' ? 'bold' : 'normal'
+          }}
+        >
+          Transformers
+        </button>
+      </div>
+
+      {/* General Settings */}
+      {activeTab === 'general' && (
+        <div>
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Timer /> Timer Settings
+            </h2>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Focus Duration (minutes)
+              </label>
+              <input 
+                type="range" 
+                min="1" 
+                max="120" 
+                value={focusDuration}
+                onChange={(e) => setFocusDuration(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: getThemeColor() }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>1</span>
+                <span>{focusDuration}</span>
+                <span>120</span>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Break Duration (minutes)
+              </label>
+              <input 
+                type="range" 
+                min="1" 
+                max="30" 
+                value={breakDuration}
+                onChange={(e) => setBreakDuration(parseInt(e.target.value))}
+                style={{ width: '100%', accentColor: getThemeColor() }}
+              />
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>1</span>
+                <span>{breakDuration}</span>
+                <span>30</span>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem' }}>
+                Sound
+              </label>
+              <Button 
+                onClick={handleToggleSound}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  backgroundColor: state.preferences.soundEnabled ? getThemeColor() : 'transparent',
+                  color: 'white',
+                  border: state.preferences.soundEnabled ? 'none' : '1px solid white',
+                }}
               >
-                <Timer className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => navigate('/meditation')}
-              >
-                <Flower2 className="h-5 w-5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:text-white hover:bg-white/10"
-                onClick={() => navigate('/analytics')}
-              >
-                <BarChart2 className="h-5 w-5" />
+                {state.preferences.soundEnabled ? <Volume2 /> : <VolumeX />}
+                {state.preferences.soundEnabled ? 'Sound On' : 'Sound Off'}
               </Button>
             </div>
           </div>
-        </div>
-      </nav>
-
-      <main className="container mx-auto px-4">
-        <div className="min-h-screen pt-24 pb-8">
-          <h1 className="text-3xl font-bold mb-8">Settings</h1>
           
-          <div className="space-y-8 max-w-2xl">
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold mb-4">Faction</h2>
-              <div className="grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => handlePreferenceChange('faction', 'autobots')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    state.preferences.faction === 'autobots'
-                      ? 'border-blue-500 bg-blue-500/20'
-                      : 'border-white/10 hover:border-blue-500/50'
-                  }`}
-                >
-                  <h3 className="text-xl font-bold mb-2">Autobots</h3>
-                  <p className="text-sm text-white/60">Freedom is the right of all sentient beings</p>
-                </button>
-                <button
-                  onClick={() => handlePreferenceChange('faction', 'decepticons')}
-                  className={`p-4 rounded-lg border-2 transition-all ${
-                    state.preferences.faction === 'decepticons'
-                      ? 'border-purple-500 bg-purple-500/20'
-                      : 'border-white/10 hover:border-purple-500/50'
-                  }`}
-                >
-                  <h3 className="text-xl font-bold mb-2">Decepticons</h3>
-                  <p className="text-sm text-white/60">Peace through tyranny</p>
-                </button>
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <BarChart2 /> Statistics
+            </h2>
+            
+            <div style={{ 
+              backgroundColor: '#2a2a2a',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span>Sessions Completed</span>
+                <span>{state.stats.sessionsCompleted}</span>
               </div>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold mb-4">Character</h2>
-              <div className="grid grid-cols-2 gap-4">
-                {state.preferences.faction === 'autobots' ? (
-                  <>
-                    <button
-                      onClick={() => handlePreferenceChange('character', 'optimus')}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        state.preferences.character === 'optimus'
-                          ? 'border-blue-500 bg-blue-500/20'
-                          : 'border-white/10 hover:border-blue-500/50'
-                      }`}
-                    >
-                      <h3 className="text-xl font-bold mb-2">Optimus Prime</h3>
-                      <p className="text-sm text-white/60">Leader of the Autobots</p>
-                    </button>
-                    <button
-                      onClick={() => handlePreferenceChange('character', 'bumblebee')}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        state.preferences.character === 'bumblebee'
-                          ? 'border-blue-500 bg-blue-500/20'
-                          : 'border-white/10 hover:border-blue-500/50'
-                      }`}
-                    >
-                      <h3 className="text-xl font-bold mb-2">Bumblebee</h3>
-                      <p className="text-sm text-white/60">Scout and warrior</p>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => handlePreferenceChange('character', 'megatron')}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        state.preferences.character === 'megatron'
-                          ? 'border-purple-500 bg-purple-500/20'
-                          : 'border-white/10 hover:border-purple-500/50'
-                      }`}
-                    >
-                      <h3 className="text-xl font-bold mb-2">Megatron</h3>
-                      <p className="text-sm text-white/60">Leader of the Decepticons</p>
-                    </button>
-                    <button
-                      onClick={() => handlePreferenceChange('character', 'starscream')}
-                      className={`p-4 rounded-lg border-2 transition-all ${
-                        state.preferences.character === 'starscream'
-                          ? 'border-purple-500 bg-purple-500/20'
-                          : 'border-white/10 hover:border-purple-500/50'
-                      }`}
-                    >
-                      <h3 className="text-xl font-bold mb-2">Starscream</h3>
-                      <p className="text-sm text-white/60">Air Commander</p>
-                    </button>
-                  </>
-                )}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span>Current Streak</span>
+                <span>{state.stats.currentStreak} days</span>
               </div>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold mb-4">Timer Settings</h2>
-              <div className="grid gap-6">
-                <div>
-                  <label className="block text-sm font-medium mb-2">Focus Duration (minutes)</label>
-                  <input
-                    type="number"
-                    value={state.presets.focus / 60}
-                    onChange={(e) => handlePresetChange('focus', Math.max(1, parseInt(e.target.value)) * 60)}
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Break Duration (minutes)</label>
-                  <input
-                    type="number"
-                    value={state.presets.break / 60}
-                    onChange={(e) => handlePresetChange('break', Math.max(1, parseInt(e.target.value)) * 60)}
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-2">Background Music (YouTube URL)</label>
-                  <input
-                    type="text"
-                    value={state.preferences.youtubeUrl || ''}
-                    onChange={(e) => handlePreferenceChange('youtubeUrl', e.target.value)}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    className="w-full bg-black/20 border border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="soundEnabled"
-                    checked={state.preferences.soundEnabled}
-                    onChange={(e) => handlePreferenceChange('soundEnabled', e.target.checked)}
-                    className="w-4 h-4 rounded border-white/10 text-blue-500 focus:ring-blue-500 focus:ring-offset-0 bg-black/20"
-                  />
-                  <label htmlFor="soundEnabled" className="text-sm font-medium">
-                    Enable Sound Notifications
-                  </label>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                <span>Longest Streak</span>
+                <span>{state.stats.longestStreak} days</span>
               </div>
-            </section>
-
-            <section className="space-y-4">
-              <h2 className="text-2xl font-semibold">Data Management</h2>
-              <div className="grid gap-4">
-                <div className="p-4 rounded-lg border border-white/10 bg-white/5 backdrop-blur-sm">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">Reset Statistics</h3>
-                      <p className="text-sm text-white/60">Clear all progress and achievements</p>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      className="text-white bg-red-500/20 hover:bg-red-500/30 border-red-500/30"
-                      onClick={() => {
-                        if (confirm('Are you sure? This action cannot be undone.')) {
-                          resetStats();
-                        }
-                      }}
-                    >
-                      Reset Stats
-                    </Button>
-                  </div>
-                </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>Total Focus Time</span>
+                <span>{Math.round(state.stats.totalFocusTime / 60)} minutes</span>
               </div>
-            </section>
+            </div>
+            
+            <Button 
+              onClick={handleReset}
+              variant="destructive"
+            >
+              Reset Statistics
+            </Button>
           </div>
         </div>
-      </main>
+      )}
+
+      {/* Transformers Settings */}
+      {activeTab === 'transformers' && (
+        <div>
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
+              Choose Your Faction
+            </h2>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              {factions.map(faction => (
+                <button
+                  key={faction.id}
+                  onClick={() => handleFactionChange(faction.id as 'autobots' | 'decepticons')}
+                  style={{
+                    backgroundColor: state.preferences.faction === faction.id ? 
+                      (faction.id === 'autobots' ? '#3b82f6' : '#9333ea') : 
+                      'transparent',
+                    color: 'white',
+                    border: state.preferences.faction === faction.id ? 
+                      'none' : 
+                      '1px solid white',
+                    borderRadius: '0.5rem',
+                    padding: '1rem',
+                    textAlign: 'left',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                    {faction.name}
+                  </div>
+                  <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>
+                    {faction.description}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
+              Choose Your Character
+            </h2>
+            
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1rem'
+            }}>
+              {characters
+                .filter(char => {
+                  // Filter characters based on faction
+                  if (state.preferences.faction === 'autobots') {
+                    return ['optimus', 'bumblebee'].includes(char.id);
+                  } else {
+                    return ['megatron', 'starscream'].includes(char.id);
+                  }
+                })
+                .map(character => (
+                  <button
+                    key={character.id}
+                    onClick={() => handleCharacterChange(character.id as any)}
+                    style={{
+                      backgroundColor: state.preferences.character === character.id ? 
+                        getThemeColor() : 
+                        'transparent',
+                      color: 'white',
+                      border: state.preferences.character === character.id ? 
+                        'none' : 
+                        '1px solid white',
+                      borderRadius: '0.5rem',
+                      padding: '1rem',
+                      textAlign: 'left',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <div style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>
+                      {character.name}
+                    </div>
+                    <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>
+                      {character.description}
+                    </div>
+                  </button>
+                ))}
+            </div>
+          </div>
+          
+          <div style={{ marginBottom: '2rem' }}>
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem' }}>
+              Matrix of Leadership Progress
+            </h2>
+            
+            <div style={{ 
+              backgroundColor: '#2a2a2a',
+              borderRadius: '0.5rem',
+              padding: '1rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{ marginBottom: '0.5rem' }}>
+                Progress: {state.stats.sessionsCompleted % 10} / 10
+              </div>
+              <div style={{ 
+                height: '0.75rem', 
+                backgroundColor: '#374151', 
+                borderRadius: '9999px', 
+                overflow: 'hidden',
+                marginBottom: '1rem'
+              }}>
+                <div style={{ 
+                  height: '100%', 
+                  width: `${(state.stats.sessionsCompleted % 10) * 10}%`, 
+                  backgroundColor: getThemeColor(),
+                  transition: 'width 0.3s ease'
+                }}></div>
+              </div>
+              <div style={{ fontSize: '0.875rem', opacity: 0.8 }}>
+                Complete 10 focus sessions to earn a piece of the Matrix of Leadership
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div style={{ 
+        marginTop: 'auto', 
+        display: 'flex', 
+        justifyContent: 'flex-end',
+        gap: '1rem',
+        paddingTop: '2rem'
+      }}>
+        <Button 
+          variant="outline"
+          onClick={() => navigate('/')}
+        >
+          Cancel
+        </Button>
+        <Button 
+          onClick={handleSave}
+        >
+          Save Changes
+        </Button>
+      </div>
     </div>
   );
 }

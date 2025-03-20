@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useTimer } from '../context/TimerContext';
 
 const themeMap = {
@@ -51,29 +51,111 @@ const themeMap = {
     'muted-foreground': '0 0% 63.9%',
     accent: '0 0% 10%',
     'accent-foreground': '0 0% 100%',
-    border: '0 0% 14.9%',
+    border: '0 0% 20%',
+  },
+  dark: {
+    background: '222.2 84% 4.9%',
+    foreground: '210 40% 98%',
+    card: '222.2 84% 4.9%',
+    'card-foreground': '210 40% 98%',
+    popover: '222.2 84% 4.9%',
+    'popover-foreground': '210 40% 98%',
+    primary: '217.2 91.2% 59.8%',
+    'primary-foreground': '222.2 47.4% 11.2%',
+    secondary: '217.2 32.6% 17.5%',
+    'secondary-foreground': '210 40% 98%',
+    muted: '217.2 32.6% 17.5%',
+    'muted-foreground': '215 20.2% 65.1%',
+    accent: '217.2 32.6% 17.5%',
+    'accent-foreground': '210 40% 98%',
+    border: '217.2 32.6% 17.5%',
   },
 };
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
+type Theme = 'dark' | 'light' | 'system';
+
+type ThemeProviderProps = {
+  children: React.ReactNode;
+  defaultTheme?: Theme;
+  storageKey?: string;
+};
+
+type ThemeProviderState = {
+  theme: Theme;
+  setTheme: (theme: Theme) => void;
+};
+
+const initialState: ThemeProviderState = {
+  theme: 'system',
+  setTheme: () => null,
+};
+
+const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+
+export function ThemeProvider({
+  children,
+  defaultTheme = 'system',
+  storageKey = 'vite-ui-theme',
+  ...props
+}: ThemeProviderProps) {
+  const [theme, setTheme] = useState<Theme>(
+    () => (localStorage.getItem(storageKey) as Theme) || defaultTheme
+  );
   const { state } = useTimer();
-  const theme = state?.preferences?.theme || 'allspark';
 
-  React.useEffect(() => {
-    const root = document.documentElement;
-    const themeColors = themeMap[theme];
-    root.className = theme; // Add theme class for potential CSS overrides
+  useEffect(() => {
+    const root = window.document.documentElement;
+    root.classList.remove('light', 'dark');
 
-    // Apply theme colors as CSS variables
-    for (const [key, value] of Object.entries(themeColors)) {
-      root.style.setProperty(`--${key}`, value);
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+        .matches
+        ? 'dark'
+        : 'light';
+      root.classList.add(systemTheme);
+      return;
     }
 
-    // Set base styles
-    root.style.setProperty('--radius', '0.5rem');
-    root.style.backgroundColor = `hsl(var(--background))`;
-    root.style.color = `hsl(var(--foreground))`;
+    root.classList.add(theme);
   }, [theme]);
 
-  return <>{children}</>;
+  // Apply Transformers theme colors
+  useEffect(() => {
+    if (!state) return;
+    
+    console.log('Applying theme colors for:', state.preferences.theme);
+    
+    const root = window.document.documentElement;
+    const themeColors = themeMap[state.preferences.theme] || themeMap.dark;
+    
+    // Apply each CSS variable
+    Object.entries(themeColors).forEach(([key, value]) => {
+      root.style.setProperty(`--${key}`, value);
+    });
+    
+    // Force background color to ensure visibility
+    document.body.style.backgroundColor = `hsl(${themeColors.background})`;
+    document.body.style.color = `hsl(${themeColors.foreground})`;
+  }, [state?.preferences.theme]);
+
+  const value = {
+    theme,
+    setTheme: (theme: Theme) => {
+      localStorage.setItem(storageKey, theme);
+      setTheme(theme);
+    },
+  };
+
+  return (
+    <ThemeProviderContext.Provider {...props} value={value}>
+      {children}
+    </ThemeProviderContext.Provider>
+  );
 }
+
+export const useTheme = () => {
+  const context = useContext(ThemeProviderContext);
+  if (context === undefined)
+    throw new Error("useTheme must be used within a ThemeProvider");
+  return context;
+};

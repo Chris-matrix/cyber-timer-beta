@@ -1,5 +1,4 @@
 import React from 'react';
-import { cn } from '../../lib/utils';
 
 export interface CircularProgressProps {
   value: number;
@@ -8,6 +7,7 @@ export interface CircularProgressProps {
   showValue?: boolean;
   className?: string;
   color?: string;
+  bgColor?: string;
   children?: React.ReactNode;
 }
 
@@ -17,7 +17,8 @@ export function CircularProgress({
   strokeWidth = 6,
   showValue = false,
   className,
-  color = 'text-blue-500',
+  color = '#3b82f6',
+  bgColor = '#1f2937',
   children,
 }: CircularProgressProps) {
   const radius = 45;
@@ -27,16 +28,31 @@ export function CircularProgress({
 
   return (
     <div 
-      className={cn("relative flex items-center justify-center", className)}
-      style={{ width: `${size}px`, height: `${size}px` }}
+      style={{ 
+        position: 'relative', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center',
+        width: `${size}px`, 
+        height: `${size}px`,
+        ...(className ? {} : {})
+      }}
     >
       <svg
-        className="absolute w-full h-full -rotate-90 transform"
+        style={{
+          position: 'absolute',
+          width: '100%',
+          height: '100%',
+          transform: 'rotate(-90deg)'
+        }}
         viewBox="0 0 100 100"
       >
         {/* Background circle */}
         <circle
-          className="fill-none stroke-white/10"
+          style={{ 
+            fill: 'none',
+            stroke: bgColor 
+          }}
           cx="50"
           cy="50"
           r={radius}
@@ -45,25 +61,29 @@ export function CircularProgress({
         {/* Progress circle */}
         <circle
           style={{
+            fill: 'none',
             transition: 'stroke-dashoffset 0.5s ease',
-            stroke: color
+            stroke: color,
+            strokeDasharray: circumference,
+            strokeDashoffset: offset,
+            strokeLinecap: 'round',
           }}
-          className="fill-none transition-all duration-300"
           cx="50"
           cy="50"
           r={radius}
           strokeWidth={strokeWidth}
-          strokeLinecap="round"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
         />
       </svg>
-      <div className="relative flex flex-col items-center justify-center">
-        {children}
-        {showValue && (
-          <span className="text-2xl font-semibold">{Math.round(progress)}%</span>
-        )}
-      </div>
+      {showValue && (
+        <div style={{
+          position: 'absolute',
+          fontSize: '1.5rem',
+          fontWeight: 'bold'
+        }}>
+          {Math.round(progress)}%
+        </div>
+      )}
+      {children}
     </div>
   );
 }
