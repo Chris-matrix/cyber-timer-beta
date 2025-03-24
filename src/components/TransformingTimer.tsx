@@ -13,7 +13,7 @@
  * - Character quotes during transformations
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTimer } from '../context/TimerContext';
 import { playNotificationSound } from '../lib/audio';
 
@@ -54,14 +54,11 @@ export default function TransformingTimer({
   /** State for the current rotation angle of the timer (0-360 degrees) */
   const [rotation, setRotation] = useState(0);
   
+  /** Reference to store the rotation interval ID */
+  const rotationIntervalRef = useRef<number | null>(null);
+  
   /** State to track if the energy pulse effect should be shown */
   const [pulseEffect, setPulseEffect] = useState(false);
-  
-  /** 
-   * Counter for transformation animations
-   * Used to cycle between different animation styles
-   */
-  const [transformationCount, setTransformationCount] = useState(0);
   
   /**
    * Gets the primary color based on the selected faction
@@ -110,107 +107,90 @@ export default function TransformingTimer({
   const progress = Math.max(0, Math.min(100, (1 - timeRemaining / totalTime) * 100));
   
   /**
-   * Effect hook to handle shape transformations based on timer progress
+   * Effect: Handle shape transformations based on timer progress
    * 
-   * Transforms occur at specific progress points:
-   * - 25%: Circle → Square
-   * - 50%: Square → Diamond
-   * - 75%: Diamond → Shield
-   * - 100%: Shield → Star
-   * 
-   * Also handles special cases for timer reset, completion, and break timers
+   * This effect monitors the timer progress and triggers shape transformations
+   * at specific milestones (25%, 50%, 75%, 100%)
    */
   useEffect(() => {
-    // Transform shape at specific progress points
-    if (isRunning && !isComplete) {
-      if (progress >= 25 && progress < 25.5) {
-        transformShape('square');
-      } else if (progress >= 50 && progress < 50.5) {
-        transformShape('diamond');
-      } else if (progress >= 75 && progress < 75.5) {
-        transformShape('shield');
-      } else if (progress >= 99.5) {
-        transformShape('star');
-      }
-    }
-    
-    // Reset to circle when timer is reset or completed
-    if (!isRunning && progress === 0) {
-      setShape('circle');
-    }
-    
-    // Handle completion
+    // If timer is complete, transform to star shape
     if (isComplete && shape !== 'star') {
-      transformShape('star');
+      setIsTransforming(true);
+      setShape('star');
+      playNotificationSound('complete', state.preferences.faction);
+      setTimeout(() => setIsTransforming(false), 1000);
+      return;
     }
     
-    // Handle break timer
-    if (activePreset === 'break' || activePreset === 'shortBreak') {
+    if (!isRunning) return;
+    
+    // Calculate progress percentage
+    const progress = ((totalTime - timeRemaining) / totalTime) * 100;
+    
+    // Determine shape based on progress
+    if (progress >= 0 && progress < 25) {
+      setShape('circle');
+    } else if (progress >= 25 && progress < 50) {
+      if (shape !== 'square') {
+        setIsTransforming(true);
+        setShape('square');
+        playNotificationSound('transform', state.preferences.faction);
+        
+        // Reset transforming state after animation completes
+        setTimeout(() => setIsTransforming(false), 1000);
+      }
+    } else if (progress >= 50 && progress < 75) {
+      if (shape !== 'diamond') {
+        setIsTransforming(true);
+        setShape('diamond');
+        playNotificationSound('transform', state.preferences.faction);
+        
+        // Reset transforming state after animation completes
+        setTimeout(() => setIsTransforming(false), 1000);
+      }
+    } else if (progress >= 75 && progress < 100) {
       if (shape !== 'shield') {
-        transformShape('shield');
+        setIsTransforming(true);
+        setShape('shield');
+        playNotificationSound('transform', state.preferences.faction);
+        
+        // Reset transforming state after animation completes
+        setTimeout(() => setIsTransforming(false), 1000);
       }
     }
-  }, [progress, isRunning, isComplete, activePreset, shape]);
+  }, [isRunning, isComplete, timeRemaining, totalTime, shape, state.preferences.faction]);
   
   /**
    * Effect hook to handle timer rotation animation
-   * Creates a continuous rotation effect while the timer is running
-   */
-  useEffect(() => {
-    if (isRunning && !isComplete) {
-      const interval = setInterval(() => {
-        setRotation(prev => (prev + 1) % 360);
-      }, 1000);
-      
-      return () => clearInterval(interval);
-    } else {
-      setRotation(0);
-    }
-  }, [isRunning, isComplete]);
-  
-  /**
-   * Effect hook to add pulse effects at regular intervals
-   * Creates an energy pulse effect every 5 minutes during focus sessions
-   */
-  useEffect(() => {
-    if (isRunning && !isComplete && activePreset.includes('focus')) {
-      const pulseInterval = setInterval(() => {
-        if (timeRemaining % 300 === 0 && timeRemaining > 0) {
-          setPulseEffect(true);
-          setTimeout(() => setPulseEffect(false), 2000);
-        }
-      }, 1000);
-      
-      return () => clearInterval(pulseInterval);
-    }
-  }, [isRunning, isComplete, timeRemaining, activePreset]);
-  
-  /**
-   * Handles the transformation between shapes with animation and sound effects
    * 
-   * @param {string} newShape - The shape to transform into
+   * This effect creates a smooth rotation animation while the timer is running
    */
-  const transformShape = (newShape: 'circle' | 'square' | 'diamond' | 'shield' | 'star') => {
-    if (shape === newShape) return;
+  useEffect(() => {
+    // Disable rotation animation
+    setRotation(0);
     
-    setIsTransforming(true);
-    setTransformationCount(prev => prev + 1);
-    
-    // Play transformation sound
-    if (state.preferences.soundEnabled) {
-      playNotificationSound('transform', state.preferences.faction as any);
+    // Clear any existing rotation interval
+    if (rotationIntervalRef.current) {
+      clearInterval(rotationIntervalRef.current);
+      rotationIntervalRef.current = null;
     }
+  }, [isRunning]);
+  
+  /**
+   * Effect hook to create energy pulse animations
+   * 
+   * Adds visual interest with periodic pulse effects
+   */
+  useEffect(() => {
+    if (!isRunning) return;
     
-    // Set new shape after a short delay
-    setTimeout(() => {
-      setShape(newShape);
-      
-      // End transformation animation
-      setTimeout(() => {
-        setIsTransforming(false);
-      }, 500);
-    }, 500);
-  };
+    const pulseInterval = setInterval(() => {
+      setPulseEffect(true);
+      setTimeout(() => setPulseEffect(false), 500);
+    }, 3000);
+    
+    return () => clearInterval(pulseInterval);
+  }, [isRunning]);
   
   /**
    * Formats the time remaining as MM:SS
@@ -293,7 +273,7 @@ export default function TransformingTimer({
         style={{
           ...getShapeStyles(),
           animation: isTransforming 
-            ? `transform-pulse-${transformationCount % 3} 1s cubic-bezier(0.68, -0.55, 0.27, 1.55)` 
+            ? `transform-pulse 1s cubic-bezier(0.68, -0.55, 0.27, 1.55)` 
             : pulseEffect 
               ? 'energy-pulse 2s ease' 
               : 'none'
@@ -408,28 +388,10 @@ export default function TransformingTimer({
       <style>
         {`
           /* Rotation and scale animation - Variation 1 */
-          @keyframes transform-pulse-0 {
+          @keyframes transform-pulse {
             0% { transform: scale(1) rotate(${rotation}deg); }
             50% { transform: scale(1.2) rotate(${rotation + 180}deg); }
             100% { transform: scale(1) rotate(${rotation + 360}deg); }
-          }
-          
-          /* Rotation and scale animation - Variation 2 */
-          @keyframes transform-pulse-1 {
-            0% { transform: scale(1) rotate(${rotation}deg); }
-            25% { transform: scale(0.8) rotate(${rotation + 90}deg); }
-            50% { transform: scale(1.2) rotate(${rotation + 180}deg); }
-            75% { transform: scale(0.9) rotate(${rotation + 270}deg); }
-            100% { transform: scale(1) rotate(${rotation + 360}deg); }
-          }
-          
-          /* Rotation, scale, and opacity animation - Variation 3 */
-          @keyframes transform-pulse-2 {
-            0% { transform: scale(1) rotate(${rotation}deg); opacity: 1; }
-            25% { transform: scale(1.1) rotate(${rotation + 90}deg); opacity: 0.8; }
-            50% { transform: scale(0.9) rotate(${rotation + 180}deg); opacity: 1; }
-            75% { transform: scale(1.2) rotate(${rotation + 270}deg); opacity: 0.9; }
-            100% { transform: scale(1) rotate(${rotation + 360}deg); opacity: 1; }
           }
           
           /* Glow pulse animation for energy effect */

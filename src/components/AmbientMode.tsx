@@ -3,6 +3,7 @@ import { useTimer } from '../context/TimerContext';
 
 interface AmbientModeProps {
   isActive: boolean;
+  onExit: () => void;
 }
 
 // Define character data for animations
@@ -17,7 +18,7 @@ const characters = [
   { name: 'Waspinator', faction: 'predacons', position: 'top', delay: 20000 },
 ];
 
-export default function AmbientMode({ isActive }: AmbientModeProps) {
+export default function AmbientMode({ isActive, onExit }: AmbientModeProps) {
   const { state } = useTimer();
   const [visibleCharacters, setVisibleCharacters] = useState<string[]>([]);
   const [background, setBackground] = useState<'cybertron' | 'earth'>('cybertron');
@@ -77,18 +78,39 @@ export default function AmbientMode({ isActive }: AmbientModeProps) {
   if (!isActive) return null;
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: '#000',
-      zIndex: 50,
-      opacity: isActive ? 1 : 0,
-      transition: 'opacity 1s ease',
-      overflow: 'hidden'
-    }}>
+    <div 
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: '#000',
+        zIndex: 50,
+        opacity: isActive ? 1 : 0,
+        transition: 'opacity 1s ease',
+        overflow: 'hidden',
+        cursor: 'pointer'
+      }}
+      onClick={onExit}
+    >
+      {/* Exit instructions */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        color: '#fff',
+        padding: '10px 20px',
+        borderRadius: '5px',
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        zIndex: 60,
+        fontSize: '14px',
+        textAlign: 'center'
+      }}>
+        Click anywhere to exit ambient mode
+      </div>
+
       {/* Background */}
       <div style={{
         position: 'absolute',

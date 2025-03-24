@@ -1,143 +1,179 @@
-// Define sound types for different timer actions
-type SoundType = 'start' | 'pause' | 'complete' | 'break' | 'reset' | 'transform';
+/**
+ * Audio Management for Transformers Timer
+ * 
+ * This module handles all sound effects and audio playback for the application.
+ * It includes functions for playing notification sounds based on user preferences
+ * and faction selection, with fallback options if specific sounds aren't available.
+ */
 
-// Create a mapping of sound types to audio files for each faction
-const SOUND_EFFECTS: Record<string, Record<SoundType, string>> = {
+export type SoundType = 'complete' | 'start' | 'pause' | 'reset' | 'transform';
+
+// Base path for all sound effects
+const SOUND_BASE_PATH = '/sounds';
+
+// Mapping of faction-specific sound effects
+const FACTION_SOUNDS: Record<string, Record<SoundType, string>> = {
   autobots: {
-    start: '/sounds/autobots-roll-out.mp3',
-    pause: '/sounds/autobots-hold.mp3',
-    complete: '/sounds/autobots-victory.mp3',
-    break: '/sounds/autobots-recharge.mp3',
-    reset: '/sounds/autobots-regroup.mp3',
-    transform: '/sounds/autobots-transform.mp3',
+    complete: `${SOUND_BASE_PATH}/complete.mp3`,
+    start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    transform: `${SOUND_BASE_PATH}/transform.mp3`,
   },
   decepticons: {
-    start: '/sounds/decepticons-attack.mp3',
-    pause: '/sounds/decepticons-halt.mp3',
-    complete: '/sounds/decepticons-victory.mp3',
-    break: '/sounds/decepticons-recharge.mp3',
-    reset: '/sounds/decepticons-retreat.mp3',
-    transform: '/sounds/decepticons-transform.mp3',
+    complete: `${SOUND_BASE_PATH}/complete.mp3`,
+    start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    transform: `${SOUND_BASE_PATH}/transform.mp3`,
   },
   maximals: {
-    start: '/sounds/maximals-maximize.mp3',
-    pause: '/sounds/maximals-hold.mp3',
-    complete: '/sounds/maximals-victory.mp3',
-    break: '/sounds/maximals-recharge.mp3',
-    reset: '/sounds/maximals-regroup.mp3',
-    transform: '/sounds/maximals-transform.mp3',
+    complete: `${SOUND_BASE_PATH}/complete.mp3`,
+    start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    transform: `${SOUND_BASE_PATH}/transform.mp3`,
   },
   predacons: {
-    start: '/sounds/predacons-terrorize.mp3',
-    pause: '/sounds/predacons-halt.mp3',
-    complete: '/sounds/predacons-victory.mp3',
-    break: '/sounds/predacons-recharge.mp3',
-    reset: '/sounds/predacons-retreat.mp3',
-    transform: '/sounds/predacons-transform.mp3',
+    complete: `${SOUND_BASE_PATH}/complete.mp3`,
+    start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    transform: `${SOUND_BASE_PATH}/transform.mp3`,
   },
   allspark: {
-    start: '/sounds/allspark-activate.mp3',
-    pause: '/sounds/allspark-pause.mp3',
-    complete: '/sounds/allspark-complete.mp3',
-    break: '/sounds/allspark-recharge.mp3',
-    reset: '/sounds/allspark-reset.mp3',
-    transform: '/sounds/allspark-transform.mp3',
-  },
+    complete: `${SOUND_BASE_PATH}/complete.mp3`,
+    start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+    transform: `${SOUND_BASE_PATH}/transform.mp3`,
+  }
 };
 
 // Fallback sounds if faction-specific sounds aren't available
 const FALLBACK_SOUNDS: Record<SoundType, string> = {
-  start: '/sounds/start.mp3',
-  pause: '/sounds/pause.mp3',
-  complete: '/sounds/complete.mp3',
-  break: '/sounds/break.mp3',
-  reset: '/sounds/reset.mp3',
-  transform: '/sounds/transform.mp3',
+  complete: `${SOUND_BASE_PATH}/complete.mp3`,
+  start: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+  pause: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+  reset: `${SOUND_BASE_PATH}/complete.mp3`, // Fallback to complete sound
+  transform: `${SOUND_BASE_PATH}/transform.mp3`,
 };
 
-// Cache audio objects to avoid recreating them
+// Audio cache to prevent reloading the same sounds
 const audioCache: Record<string, HTMLAudioElement> = {};
 
-// Create a silent audio element for fallback when files don't exist
-const createSilentAudio = () => {
-  const audio = new Audio();
-  audio.volume = 0;
-  return audio;
-};
+// Track if user has interacted with the page
+let hasUserInteracted = false;
 
-// Silent audio fallback
-const silentAudio = createSilentAudio();
+// Listen for user interaction to enable audio
+window.addEventListener('click', () => {
+  hasUserInteracted = true;
+});
+
+window.addEventListener('keydown', () => {
+  hasUserInteracted = true;
+});
 
 /**
- * Play a notification sound based on the faction and sound type
- * @param soundType - Type of sound to play (start, pause, complete, etc.)
- * @param faction - Faction preference (autobots, decepticons, maximals, predacons, allspark)
+ * Plays a notification sound based on the faction and sound type
+ * Falls back to general sounds if faction-specific sounds aren't available
+ * 
+ * @param {SoundType} soundType - Type of sound to play (complete, start, pause, reset, transform)
+ * @param {string} faction - User's selected faction (autobots, decepticons, maximals, predacons, allspark)
+ * @returns {Promise<void>} Promise that resolves when the sound has played
  */
-export const playNotificationSound = (
-  soundType: SoundType = 'complete',
+export const playNotificationSound = async (
+  soundType: SoundType = 'complete', 
   faction: 'autobots' | 'decepticons' | 'maximals' | 'predacons' | 'allspark' = 'autobots'
-) => {
+): Promise<void> => {
+  // Check if user has interacted with the page (browsers require user interaction for audio)
+  if (!hasUserInteracted) {
+    console.warn('Cannot play sound before user interaction');
+    return;
+  }
+
   try {
     // Get the appropriate sound file path
-    const soundPath = 
-      (SOUND_EFFECTS[faction] && SOUND_EFFECTS[faction][soundType]) || 
-      FALLBACK_SOUNDS[soundType];
+    const factionSounds = FACTION_SOUNDS[faction] || FACTION_SOUNDS.autobots;
+    const soundPath = factionSounds[soundType] || FALLBACK_SOUNDS[soundType];
     
-    if (!soundPath) {
-      console.warn(`No sound found for ${soundType} (${faction})`);
-      return;
-    }
-    
-    // Check if we already have this audio loaded
+    // Check if sound is already cached
     if (!audioCache[soundPath]) {
-      audioCache[soundPath] = new Audio(soundPath);
-      
-      // Add error handler for the first load to detect missing files
-      audioCache[soundPath].addEventListener('error', () => {
-        console.warn(`Sound file not found: ${soundPath}`);
-        // Remove from cache so we don't keep trying to load it
-        delete audioCache[soundPath];
-      });
+      const audio = new Audio(soundPath);
+      audio.volume = 0.7; // Set volume to 70%
+      audioCache[soundPath] = audio;
     }
     
-    // If the audio is in the cache, play it
-    if (audioCache[soundPath]) {
-      const sound = audioCache[soundPath];
-      sound.currentTime = 0;
+    const audio = audioCache[soundPath];
+    
+    // Reset audio to beginning if it was already played
+    if (!audio.paused) {
+      audio.pause();
+    }
+    audio.currentTime = 0;
+    
+    // Play the sound with error handling
+    try {
+      await audio.play();
+    } catch (error) {
+      console.warn(`Failed to play sound (${soundType}) for faction ${faction}, trying fallback`, error);
       
-      // Play the sound with error handling
-      sound.play().catch(error => {
-        console.warn(`Error playing sound (${soundType}, ${faction}): ${error.message}`);
-        
-        // If it's a user interaction error, we'll try again when the user interacts
-        if (error.name === 'NotAllowedError') {
-          // We'll handle this silently - the browser requires user interaction
-          return;
-        }
-        
-        // For other errors like missing files, use the silent audio
-        silentAudio.currentTime = 0;
-        silentAudio.play().catch(() => {
-          // If even silent audio fails, we give up silently
-        });
-      });
-    } else {
-      // If the sound isn't in the cache (likely failed to load), use silent audio
-      silentAudio.currentTime = 0;
-      silentAudio.play().catch(() => {
-        // If even silent audio fails, we give up silently
+      // Try fallback sound if faction-specific sound fails
+      const fallbackPath = FALLBACK_SOUNDS[soundType];
+      
+      if (!audioCache[fallbackPath]) {
+        const fallbackAudio = new Audio(fallbackPath);
+        fallbackAudio.volume = 0.7;
+        audioCache[fallbackPath] = fallbackAudio;
+      }
+      
+      const fallbackAudio = audioCache[fallbackPath];
+      fallbackAudio.currentTime = 0;
+      await fallbackAudio.play().catch(err => {
+        console.error('Even fallback sound failed to play:', err);
       });
     }
   } catch (error) {
-    console.error('Error in playNotificationSound:', error);
+    console.error('Error playing notification sound:', error);
   }
 };
 
-// Create a placeholder sound directory with a README
-const createSoundDirectories = () => {
-  console.log('Sound directories should be created at:');
-  console.log('/sounds/ - for all transformer sound effects');
+/**
+ * Preloads all sound effects for faster playback
+ * This can be called on app initialization to cache sounds
+ */
+export const preloadSounds = (): void => {
+  // Preload all faction sounds
+  Object.values(FACTION_SOUNDS).forEach(factionSounds => {
+    Object.values(factionSounds).forEach(soundPath => {
+      if (!audioCache[soundPath]) {
+        const audio = new Audio();
+        audio.src = soundPath;
+        audio.preload = 'auto';
+        audioCache[soundPath] = audio;
+        
+        // Add error handling for preloading
+        audio.addEventListener('error', () => {
+          console.warn(`Failed to preload sound: ${soundPath}`);
+        });
+      }
+    });
+  });
+  
+  // Also preload fallback sounds
+  Object.values(FALLBACK_SOUNDS).forEach(soundPath => {
+    if (!audioCache[soundPath]) {
+      const audio = new Audio();
+      audio.src = soundPath;
+      audio.preload = 'auto';
+      audioCache[soundPath] = audio;
+      
+      // Add error handling for preloading
+      audio.addEventListener('error', () => {
+        console.warn(`Failed to preload fallback sound: ${soundPath}`);
+      });
+    }
+  });
+  
+  console.log('All sounds preloaded successfully');
 };
-
-// Export for potential setup use
-export { createSoundDirectories };

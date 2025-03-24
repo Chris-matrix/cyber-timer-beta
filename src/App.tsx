@@ -13,114 +13,62 @@
  * - Manages faction selection state to control initial navigation
  */
 
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { TimerProvider } from './context/TimerContext';
+import { TimerProvider, useTimer } from './context/TimerContext';
 import Timer from './components/Timer';
-import Settings from './pages/Settings';
 import Stats from './pages/Stats';
-import LoadingPage from './pages/LoadingPage';
-import { ThemeProvider } from './components/theme-provider';
-import { NotificationProvider } from './components/ui/notification';
-import { useState, useEffect } from 'react';
+import Settings from './pages/Settings';
+import { preloadSounds } from './lib/audio';
 
-function App() {
-  console.log('App component rendering');
-  
-  /**
-   * State to track whether the user has selected a faction
-   * This determines whether to show the loading screen or timer
-   * 
-   * The initial value is determined by checking localStorage for existing
-   * faction and character selections from previous sessions
-   */
-  const [hasSelectedFaction, setHasSelectedFaction] = useState<boolean>(() => {
-    // Check if user has already selected a faction from localStorage
-    const timerState = localStorage.getItem('timerState');
-    if (timerState) {
-      try {
-        const parsedState = JSON.parse(timerState);
-        return !!(parsedState.preferences && parsedState.preferences.faction && parsedState.preferences.character);
-      } catch (e) {
-        return false;
-      }
-    }
-    return false;
-  });
+// CSS variables for light and dark themes
+const GlobalStyles: React.FC = () => {
+  const { state } = useTimer();
+  const isDarkMode = state.preferences.theme === 'dark';
 
-  /**
-   * Effect hook to listen for faction selection events
-   * 
-   * This ensures the application responds to faction selection changes
-   * even if they happen outside the normal flow (e.g., from another tab)
-   * by listening to localStorage changes
-   */
   useEffect(() => {
-    const checkFactionSelection = () => {
-      const timerState = localStorage.getItem('timerState');
-      if (timerState) {
-        try {
-          const parsedState = JSON.parse(timerState);
-          if (parsedState.preferences && parsedState.preferences.faction && parsedState.preferences.character) {
-            setHasSelectedFaction(true);
-          }
-        } catch (e) {
-          // Ignore parsing errors
-        }
-      }
-    };
+    // Apply theme variables to root element
+    document.documentElement.style.setProperty('--bg-primary', isDarkMode ? '#121212' : '#f8f9fa');
+    document.documentElement.style.setProperty('--bg-secondary', isDarkMode ? '#1e1e1e' : '#ffffff');
+    document.documentElement.style.setProperty('--text-primary', isDarkMode ? '#ffffff' : '#212529');
+    document.documentElement.style.setProperty('--text-secondary', isDarkMode ? '#a0a0a0' : '#6c757d');
+    document.documentElement.style.setProperty('--border-color', isDarkMode ? '#333333' : '#dee2e6');
+    
+    // Set body background color
+    document.body.style.backgroundColor = isDarkMode ? '#121212' : '#f8f9fa';
+    document.body.style.color = isDarkMode ? '#ffffff' : '#212529';
+  }, [isDarkMode]);
 
-    // Check on mount and when localStorage changes
-    window.addEventListener('storage', checkFactionSelection);
-    return () => {
-      window.removeEventListener('storage', checkFactionSelection);
-    };
+  return null;
+};
+
+// Main App Component
+function App() {
+  // Preload sounds when app starts
+  useEffect(() => {
+    preloadSounds();
   }, []);
-  
+
   return (
-    /**
-     * Application Provider Structure:
-     * 
-     * TimerProvider - Manages timer state, preferences, and achievements
-     * ├── ThemeProvider - Handles theme switching (light/dark/faction-based)
-     *     ├── NotificationProvider - Manages notification display and dismissal
-     *         └── Router - Handles navigation between different pages
-     */
     <TimerProvider>
-      <ThemeProvider defaultTheme="dark">
-        <NotificationProvider>
-          <div className="min-h-screen bg-background text-foreground">
-            <Router>
-              <Routes>
-                {/* 
-                  Loading Page - Initial screen with faction selection
-                  Passes onFactionSelected callback to update App state when selection is made
-                */}
-                <Route path="/loading" element={<LoadingPage onFactionSelected={() => setHasSelectedFaction(true)} />} />
-                
-                {/* Timer Page - Main timer functionality */}
-                <Route path="/timer" element={<Timer />} />
-                
-                {/* Settings Page - User preferences and achievements */}
-                <Route path="/settings" element={<Settings />} />
-                
-                {/* Stats Page - User statistics and progress */}
-                <Route path="/stats" element={<Stats />} />
-                
-                {/* 
-                  Root Route - Conditional navigation
-                  Redirects to timer if faction is selected, otherwise to loading screen
-                  This prevents showing the loading screen again after faction selection
-                */}
-                <Route path="/" element={
-                  hasSelectedFaction ? <Navigate to="/timer" /> : <Navigate to="/loading" />
-                } />
-              </Routes>
-            </Router>
-          </div>
-        </NotificationProvider>
-      </ThemeProvider>
+      <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <GlobalStyles />
+        <AppRoutes />
+      </Router>
     </TimerProvider>
   );
 }
+
+// Routes Component
+const AppRoutes: React.FC = () => {
+  return (
+    <Routes>
+      <Route path="/" element={<Timer />} />
+      <Route path="/stats" element={<Stats />} />
+      <Route path="/settings" element={<Settings />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+};
 
 export default App;

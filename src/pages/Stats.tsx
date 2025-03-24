@@ -48,46 +48,46 @@ export default function Stats() {
 
   // Generate chart data based on time range
   useEffect(() => {
-    // Sample data generation - in a real app, this would use actual timer stats
+    // Initialize with empty data structure
     let data: { label: string; value: number }[] = [];
     
     switch (timeRange) {
       case 'daily':
-        // Generate hourly data for today
+        // Generate hourly data for today with placeholder values
         for (let i = 0; i < 24; i++) {
           const hour = i < 10 ? `0${i}:00` : `${i}:00`;
           data.push({
             label: hour,
-            value: Math.floor(Math.random() * 60) // Random minutes per hour
+            value: 0 // Zero values instead of random data
           });
         }
         break;
       case 'weekly':
-        // Generate daily data for the week
+        // Generate daily data for the week with placeholder values
         const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
         days.forEach(day => {
           data.push({
             label: day,
-            value: Math.floor(Math.random() * 180) // Random minutes per day
+            value: 0 // Zero values instead of random data
           });
         });
         break;
       case 'monthly':
-        // Generate weekly data for the month
+        // Generate weekly data for the month with placeholder values
         for (let i = 1; i <= 4; i++) {
           data.push({
             label: `Week ${i}`,
-            value: Math.floor(Math.random() * 600) // Random minutes per week
+            value: 0 // Zero values instead of random data
           });
         }
         break;
       case 'yearly':
-        // Generate monthly data for the year
+        // Generate monthly data for the year with placeholder values
         const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
         months.forEach(month => {
           data.push({
             label: month,
-            value: Math.floor(Math.random() * 2400) // Random minutes per month
+            value: 0 // Zero values instead of random data
           });
         });
         break;
@@ -375,11 +375,11 @@ export default function Stats() {
                   points={chartData.map((item, index) => {
                     const x = (index / (chartData.length - 1)) * 100;
                     const y = 100 - (item.value / maxValue) * 100;
-                    return `${x}% ${y}%`;
+                    return `${x} ${y}`;
                   }).join(' ')}
                   fill="none"
                   stroke={getFactionColor()}
-                  strokeWidth="3"
+                  strokeWidth="2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />

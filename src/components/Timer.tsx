@@ -5,15 +5,6 @@
  * transforming timer display. It integrates with the TimerContext to manage timer state
  * and provides controls for starting, pausing, and resetting the timer, as well as
  * switching between different timer presets.
- * 
- * Features:
- * - Dual timer interfaces (Classic and Transforming)
- * - Faction-themed styling with dynamic colors
- * - Transformation animations that occur during focus sessions
- * - Battle power meter that increases during focus sessions
- * - Ambient mode for distraction-free viewing
- * - Victory celebrations when timers complete
- * - Random motivational quotes from Transformers characters
  */
 
 import { useNavigate } from 'react-router-dom';
@@ -23,84 +14,84 @@ import { useState, useEffect } from 'react';
 import { playNotificationSound } from '../lib/audio';
 import TransformingTimer from './TransformingTimer';
 import AmbientMode from './AmbientMode';
-import { BarChart2, Settings as SettingsIcon } from 'lucide-react';
+import { BarChart2, Settings as SettingsIcon, Sun, Moon } from 'lucide-react';
 
 /**
  * Timer Component
  * 
  * The main timer interface that provides functionality for focus and break sessions
- * with Transformers-themed visuals and interactions.
- * 
- * @returns {JSX.Element} The rendered Timer component
  */
 export default function Timer() {
   const navigate = useNavigate();
-  const { state, startTimer, pauseTimer, resetTimer, switchPreset } = useTimer();
+  const { state, startTimer, pauseTimer, resetTimer, switchPreset, toggleTheme } = useTimer();
   const { activePreset, presets, isRunning, timeRemaining, isComplete, preferences } = state;
   
   // State for visual and interactive elements
-  const [transformState, setTransformState] = useState<'robot' | 'vehicle'>('robot');
   const [battlePower, setBattlePower] = useState(0);
   const [showVictory, setShowVictory] = useState(false);
   const [currentQuote, setCurrentQuote] = useState('Till all are one!');
   const [useNewTimerInterface, setUseNewTimerInterface] = useState(true);
   const [ambientModeActive, setAmbientModeActive] = useState(false);
-  const [idleTime, setIdleTime] = useState(0);
 
   /**
-   * Effect: Transform animation
-   * 
-   * Toggles between robot and vehicle mode every 30 seconds while the timer is running,
-   * playing a transformation sound effect when the change occurs.
+   * Effect: Keyboard shortcuts
    */
   useEffect(() => {
-    if (!isRunning) return;
-    
-    const interval = setInterval(() => {
-      setTransformState(prev => prev === 'robot' ? 'vehicle' : 'robot');
-      // Play transformation sound
-      playNotificationSound('transform', preferences.faction);
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [isRunning, preferences.faction]);
-
-  /**
-   * Effect: Battle power progression
-   * 
-   * Increases the battle power meter by 5% every minute during focus sessions,
-   * up to a maximum of 100%.
-   */
-  useEffect(() => {
-    if (isRunning && activePreset.id === 'focus') {
-      const interval = setInterval(() => {
-        setBattlePower(prev => Math.min(100, prev + 5));
-      }, 60000); // Increase every minute
+    const handleKeyPress = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in input fields
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
       
-      return () => clearInterval(interval);
-    }
-  }, [isRunning, activePreset.id]);
+      switch (e.key.toLowerCase()) {
+        case ' ': // Space bar
+          e.preventDefault();
+          isRunning ? pauseTimer() : startTimer();
+          break;
+        case 'r':
+          if (!e.ctrlKey && !e.metaKey) {
+            e.preventDefault();
+            resetTimer();
+          }
+          break;
+        case 'f':
+          e.preventDefault();
+          // Create a focus preset object
+          const focusPreset = { id: 'focus', duration: presets.focus };
+          switchPreset(focusPreset);
+          break;
+        case 'b':
+          e.preventDefault();
+          // Create a break preset object
+          const breakPreset = { id: 'break', duration: presets.break };
+          switchPreset(breakPreset);
+          break;
+        case 'a':
+          e.preventDefault();
+          setAmbientModeActive(prev => !prev);
+          break;
+        case 't':
+          e.preventDefault();
+          toggleTheme();
+          break;
+      }
+    };
+    
+    window.addEventListener('keydown', handleKeyPress);
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+    };
+  }, [isRunning, startTimer, pauseTimer, resetTimer, switchPreset, presets, toggleTheme]);
 
   /**
    * Effect: Timer completion handler
-   * 
-   * Manages what happens when a timer completes:
-   * - Shows a victory celebration animation
-   * - Resets battle power after focus sessions
-   * - Updates the motivational quote
    */
   useEffect(() => {
-    if (timeRemaining === 0 && !isRunning) {
-      // Show victory celebration
-      setShowVictory(true);
-      setTimeout(() => setShowVictory(false), 3000);
+    if (isComplete) {
+      // Play completion sound
+      playNotificationSound('complete', 'autobots');
       
-      // Reset battle power if focus session completed
-      if (activePreset.id === 'focus') {
-        setBattlePower(0);
-      }
-      
-      // Update quote when timer completes
+      // Update motivational quote
       const quotes = [
         'Till all are one!',
         'Autobots, roll out!',
@@ -109,190 +100,186 @@ export default function Timer() {
         'More than meets the eye!'
       ];
       setCurrentQuote(quotes[Math.floor(Math.random() * quotes.length)]);
+      
+      // Show victory celebration
+      setShowVictory(true);
+      
+      // Hide victory after 5 seconds
+      setTimeout(() => {
+        setShowVictory(false);
+      }, 5000);
+      
+      // Increase battle power
+      setBattlePower(prev => Math.min(prev + 20, 100));
     }
-  }, [timeRemaining, isRunning, activePreset.id]);
+  }, [isComplete]);
 
   /**
-   * Effect: Idle time tracking
-   * 
-   * Tracks user inactivity and automatically activates ambient mode
-   * after 2 minutes of no interaction.
+   * Effect: Battle power decay
+   */
+  useEffect(() => {
+    if (!isRunning && battlePower > 0) {
+      const interval = setInterval(() => {
+        setBattlePower(prev => Math.max(prev - 1, 0));
+      }, 10000);
+      
+      return () => clearInterval(interval);
+    }
+  }, [isRunning, battlePower]);
+
+  /**
+   * Effect: Ambient mode auto-activation
    */
   useEffect(() => {
     if (ambientModeActive) return;
 
-    const idleInterval = setInterval(() => {
-      setIdleTime(prev => prev + 1);
-      
-      // Activate ambient mode after 2 minutes of inactivity
-      if (idleTime >= 120) {
-        setAmbientModeActive(true);
-        setIdleTime(0);
-      }
-    }, 1000);
+    let idleTimer: number;
     
-    // Reset idle time on user activity
-    const resetIdleTime = () => setIdleTime(0);
+    const checkIdle = () => {
+      idleTimer = window.setTimeout(() => {
+        setAmbientModeActive(true);
+      }, 120000); // 2 minutes
+    };
+    
+    // Start the idle timer
+    checkIdle();
+    
+    // Reset idle timer on user activity
+    const resetIdleTimer = () => {
+      window.clearTimeout(idleTimer);
+      checkIdle();
+    };
     
     // Add event listeners for user activity
-    window.addEventListener('mousemove', resetIdleTime);
-    window.addEventListener('keydown', resetIdleTime);
-    window.addEventListener('click', resetIdleTime);
+    window.addEventListener('mousemove', resetIdleTimer);
+    window.addEventListener('keydown', resetIdleTimer);
+    window.addEventListener('click', resetIdleTimer);
+    document.addEventListener('visibilitychange', resetIdleTimer);
     
     return () => {
-      clearInterval(idleInterval);
-      window.removeEventListener('mousemove', resetIdleTime);
-      window.removeEventListener('keydown', resetIdleTime);
-      window.removeEventListener('click', resetIdleTime);
-    };
-  }, [idleTime, ambientModeActive]);
-
-  /**
-   * Effect: Ambient mode exit handler
-   * 
-   * Exits ambient mode when the user interacts with the page
-   * through mouse movement, keyboard input, or clicks.
-   */
-  useEffect(() => {
-    if (!ambientModeActive) return;
-    
-    const exitAmbientMode = () => setAmbientModeActive(false);
-    
-    window.addEventListener('mousemove', exitAmbientMode);
-    window.addEventListener('keydown', exitAmbientMode);
-    window.addEventListener('click', exitAmbientMode);
-    
-    return () => {
-      window.removeEventListener('mousemove', exitAmbientMode);
-      window.removeEventListener('keydown', exitAmbientMode);
-      window.removeEventListener('click', exitAmbientMode);
+      window.clearTimeout(idleTimer);
+      window.removeEventListener('mousemove', resetIdleTimer);
+      window.removeEventListener('keydown', resetIdleTimer);
+      window.removeEventListener('click', resetIdleTimer);
+      document.removeEventListener('visibilitychange', resetIdleTimer);
     };
   }, [ambientModeActive]);
 
   /**
    * Formats time in seconds to MM:SS display format
-   * 
-   * @param {number} seconds - Time in seconds
-   * @returns {string} Formatted time string (MM:SS)
    */
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  const formatTime = (seconds: number): string => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
+
+  /**
+   * Gets the primary color for the timer
+   */
+  const getTimerColor = (): string => {
+    return '#3b82f6'; // Blue (Autobots color)
   };
 
   /**
    * Calculates the progress percentage for the timer
-   * Used for circular progress display
    */
-  const progress = activePreset.duration > 0 
-    ? ((activePreset.duration * 60) - timeRemaining) / (activePreset.duration * 60) * 100
-    : 0;
-
-  /**
-   * Gets the appropriate color based on the selected faction
-   * Used for theming UI elements
-   * 
-   * @returns {string} Hex color code for the selected faction
-   */
-  const getFactionColor = () => {
-    switch (preferences.faction) {
-      case 'autobots':
-        return '#3b82f6'; // Blue
-      case 'decepticons':
-        return '#9333ea'; // Purple
-      case 'maximals':
-        return '#16a34a'; // Green
-      case 'predacons':
-        return '#b91c1c'; // Red
-      default:
-        return '#3b82f6'; // Default to Autobots blue
-    }
+  const calculateProgress = (): number => {
+    const totalTime = activePreset.duration;
+    return ((totalTime - timeRemaining) / totalTime) * 100;
   };
 
-  /**
-   * Handles switching between timer presets
-   * Creates the appropriate preset object and calls the context's switchPreset function
-   * 
-   * @param {string} presetId - ID of the preset to switch to
-   */
-  const handleSwitchPreset = (presetId: string) => {
-    const presetDurations = {
-      focus: presets.focus,
-      shortFocus: presets.shortFocus,
-      break: presets.break,
-      shortBreak: presets.shortBreak
-    };
-    
-    switchPreset({
-      id: presetId,
-      duration: presetDurations[presetId as keyof typeof presetDurations]
-    });
-  };
-
+  // Main component render
   return (
-    <div style={{ 
-      backgroundColor: '#121212', 
-      color: 'white',
+    <div style={{
       minHeight: '100vh',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
+      justifyContent: 'flex-start',
       padding: '2rem',
-      position: 'relative'
+      position: 'relative',
+      backgroundColor: 'var(--bg-primary)',
+      color: 'var(--text-primary)',
+      transition: 'background-color 0.3s, color 0.3s'
     }}>
       {/* Ambient Mode */}
-      <AmbientMode isActive={ambientModeActive} />
+      {ambientModeActive && (
+        <AmbientMode 
+          isActive={ambientModeActive} 
+          onExit={() => setAmbientModeActive(false)} 
+        />
+      )}
       
       {/* Header */}
       <div style={{ 
-        width: '100%', 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        marginBottom: '2rem',
-        zIndex: 10
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: '1rem',
+        width: '100%'
       }}>
         <h1 style={{ 
-          fontSize: '2rem',
-          color: getFactionColor()
+          fontSize: '1.5rem', 
+          fontWeight: 'bold',
+          color: getTimerColor()
         }}>
           Transformers Timer
         </h1>
-        <div style={{ display: 'flex', gap: '1rem' }}>
-          <button 
+        
+        <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <button
+            onClick={toggleTheme}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: '0.375rem',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
+            }}
+            title={preferences.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {preferences.theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+          </button>
+          
+          <button
             onClick={() => navigate('/stats')}
             style={{
-              backgroundColor: 'transparent',
-              color: 'white',
-              border: `1px solid ${getFactionColor()}`,
-              borderRadius: '0.375rem',
-              padding: '0.5rem',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center',
+              padding: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: '0.375rem',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
             }}
+            title="View Stats"
           >
-            <BarChart2 size={18} />
-            Stats
+            <BarChart2 size={20} />
           </button>
-          <button 
+          
+          <button
             onClick={() => navigate('/settings')}
             style={{
-              backgroundColor: 'transparent',
-              color: 'white',
-              border: `1px solid ${getFactionColor()}`,
-              borderRadius: '0.375rem',
-              padding: '0.5rem',
-              cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '0.5rem'
+              justifyContent: 'center',
+              padding: '0.5rem',
+              backgroundColor: 'transparent',
+              border: 'none',
+              borderRadius: '0.375rem',
+              color: 'var(--text-primary)',
+              cursor: 'pointer'
             }}
+            title="Settings"
           >
-            <SettingsIcon size={18} />
-            Settings
+            <SettingsIcon size={20} />
           </button>
         </div>
       </div>
@@ -307,9 +294,9 @@ export default function Timer() {
         <button
           onClick={() => setUseNewTimerInterface(false)}
           style={{
-            backgroundColor: !useNewTimerInterface ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: !useNewTimerInterface ? getTimerColor() : 'transparent',
+            color: !useNewTimerInterface ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
@@ -320,9 +307,9 @@ export default function Timer() {
         <button
           onClick={() => setUseNewTimerInterface(true)}
           style={{
-            backgroundColor: useNewTimerInterface ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: useNewTimerInterface ? getTimerColor() : 'transparent',
+            color: useNewTimerInterface ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
@@ -333,176 +320,122 @@ export default function Timer() {
       </div>
       
       {/* Timer Display */}
-      {useNewTimerInterface ? (
-        <TransformingTimer
-          timeRemaining={timeRemaining}
-          totalTime={activePreset.duration * 60}
-          isRunning={isRunning}
-          isComplete={isComplete}
-          activePreset={activePreset.id}
-        />
-      ) : (
-        <div style={{ 
-          backgroundColor: '#2a2a2a',
-          borderRadius: '1rem',
-          padding: '2rem',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          boxShadow: `0 0 20px ${getFactionColor()}40`,
-          border: `2px solid ${getFactionColor()}80`,
-          marginBottom: '2rem',
-          position: 'relative',
-          transform: showVictory ? 'scale(1.1)' : 'scale(1)',
-          transition: 'all 0.3s ease',
-          zIndex: 10
-        }}>
-          {/* Transforming display */}
-          <div style={{ 
-            position: 'absolute',
-            inset: 0,
-            opacity: 0.2,
-            transform: transformState === 'vehicle' ? 'rotate(180deg) scale(0.75)' : 'none',
-            transition: 'all 1s ease'
-          }}></div>
-          
-          {/* Victory celebration */}
-          {showVictory && (
-            <div style={{
-              position: 'absolute',
-              inset: 0,
-              display: 'flex',
+      <div style={{ 
+        position: 'relative',
+        width: '300px',
+        height: '300px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: '2rem'
+      }}>
+        {useNewTimerInterface ? (
+          /* Transforming Timer Interface */
+          <TransformingTimer
+            timeRemaining={timeRemaining}
+            totalTime={activePreset.duration}
+            isRunning={isRunning}
+            isComplete={isComplete}
+            activePreset={activePreset.id}
+          />
+        ) : (
+          /* Classic Timer Interface */
+          <CircularProgress
+            value={calculateProgress()}
+            size={300}
+            strokeWidth={8}
+            color={getTimerColor()}
+            bgColor="var(--bg-secondary)"
+          >
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
               alignItems: 'center',
-              justifyContent: 'center',
-              animation: 'bounce 1s infinite'
+              justifyContent: 'center'
             }}>
               <div style={{ 
-                fontSize: '1.5rem', 
+                fontSize: '3rem', 
                 fontWeight: 'bold',
-                color: getFactionColor()
+                color: 'var(--text-primary)'
               }}>
-                Mission Accomplished! 
-              </div>
-            </div>
-          )}
-          
-          {/* Timer display with circular progress */}
-          <div style={{ position: 'relative', width: '256px', height: '256px' }}>
-            <CircularProgress 
-              value={progress} 
-              size={256}
-              strokeWidth={12}
-              color={getFactionColor()}
-              bgColor="#333333"
-            />
-            <div style={{ 
-              position: 'absolute', 
-              inset: 0, 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center' 
-            }}>
-              <div style={{ fontSize: '3rem', fontWeight: 'bold' }}>
                 {formatTime(timeRemaining)}
               </div>
+              <div style={{ 
+                fontSize: '1rem',
+                color: 'var(--text-secondary)',
+                marginTop: '0.5rem'
+              }}>
+                {activePreset.id === 'focus' ? 'Focus Time' : 'Break Time'}
+              </div>
+            </div>
+          </CircularProgress>
+        )}
+        
+        {/* Victory Celebration Overlay */}
+        {showVictory && (
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            borderRadius: '50%',
+            zIndex: 20,
+            animation: 'fadeIn 0.5s ease'
+          }}>
+            <div style={{ 
+              fontSize: '1.5rem', 
+              fontWeight: 'bold',
+              color: getTimerColor(),
+              marginBottom: '1rem'
+            }}>
+              Mission Complete!
+            </div>
+            <div style={{ 
+              fontSize: '1rem',
+              color: 'white',
+              textAlign: 'center',
+              padding: '0 1rem'
+            }}>
+              {currentQuote}
             </div>
           </div>
-          
-          <div style={{ marginTop: '1rem', fontSize: '1.5rem' }}>
-            {activePreset.id === 'focus' ? 'Energon Charge' : 
-             activePreset.id === 'shortFocus' ? 'Quick Scout' : 
-             activePreset.id === 'break' ? 'Recharge Break' : 'Short Break'}
-          </div>
-          <div style={{ marginTop: '0.5rem', fontStyle: 'italic', opacity: 0.8 }}>
-            {currentQuote}
-          </div>
-        </div>
-      )}
+        )}
+      </div>
       
-      {/* Battle power meter (only shown during focus) */}
-      {activePreset.id.includes('focus') && (
-        <div style={{ 
-          width: '100%', 
-          maxWidth: '28rem', 
-          backgroundColor: '#1f2937', 
-          borderRadius: '0.5rem', 
-          padding: '0.75rem',
-          marginBottom: '1.5rem',
-          zIndex: 10
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            marginBottom: '0.25rem' 
-          }}>
-            <span>Battle Power</span>
-            <span>{battlePower}%</span>
-          </div>
-          <div style={{ 
-            width: '100%', 
-            height: '0.5rem', 
-            backgroundColor: '#374151', 
-            borderRadius: '0.25rem', 
-            overflow: 'hidden' 
-          }}>
-            <div 
-              style={{ 
-                height: '100%', 
-                width: `${battlePower}%`, 
-                backgroundColor: getFactionColor(),
-                transition: 'width 0.5s ease'
-              }}
-            />
-          </div>
-        </div>
-      )}
-      
-      {/* Timer controls */}
+      {/* Timer Controls */}
       <div style={{ 
         display: 'flex', 
         gap: '1rem',
+        marginBottom: '2rem',
         zIndex: 10
       }}>
-        {!isRunning ? (
-          <button 
-            onClick={startTimer}
-            style={{
-              backgroundColor: getFactionColor(),
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
-          >
-            Start
-          </button>
-        ) : (
-          <button 
-            onClick={pauseTimer}
-            style={{
-              backgroundColor: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              padding: '0.75rem 1.5rem',
-              fontSize: '1rem',
-              fontWeight: 'bold',
-              cursor: 'pointer'
-            }}
-          >
-            Pause
-          </button>
-        )}
-        
-        <button 
+        <button
+          onClick={isRunning ? pauseTimer : startTimer}
+          style={{
+            backgroundColor: getTimerColor(),
+            color: 'white',
+            border: 'none',
+            borderRadius: '0.375rem',
+            padding: '0.75rem 1.5rem',
+            fontSize: '1rem',
+            fontWeight: 'bold',
+            cursor: 'pointer'
+          }}
+        >
+          {isRunning ? 'Pause' : 'Start'}
+        </button>
+        <button
           onClick={resetTimer}
           style={{
             backgroundColor: 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            color: 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.75rem 1.5rem',
             fontSize: '1rem',
@@ -513,93 +446,123 @@ export default function Timer() {
         </button>
       </div>
       
-      {/* Timer presets */}
+      {/* Timer Presets */}
       <div style={{ 
         display: 'flex', 
-        gap: '1rem',
-        marginTop: '2rem',
+        flexWrap: 'wrap',
+        gap: '0.5rem',
+        marginBottom: '2rem',
+        justifyContent: 'center',
         zIndex: 10
       }}>
-        <button 
-          onClick={() => handleSwitchPreset('focus')}
+        <button
+          onClick={() => switchPreset({ id: 'focus', duration: presets.focus })}
           style={{
-            backgroundColor: activePreset.id === 'focus' ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: activePreset.id === 'focus' ? getTimerColor() : 'transparent',
+            color: activePreset.id === 'focus' ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
           }}
         >
-          Focus ({presets.focus} min)
+          Focus ({Math.floor(presets.focus / 60)} min)
         </button>
-        
-        <button 
-          onClick={() => handleSwitchPreset('shortFocus')}
+        <button
+          onClick={() => switchPreset({ id: 'shortFocus', duration: presets.shortFocus })}
           style={{
-            backgroundColor: activePreset.id === 'shortFocus' ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: activePreset.id === 'shortFocus' ? getTimerColor() : 'transparent',
+            color: activePreset.id === 'shortFocus' ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
           }}
         >
-          Short Focus ({presets.shortFocus} min)
+          Short Focus ({Math.floor(presets.shortFocus / 60)} min)
         </button>
-        
-        <button 
-          onClick={() => handleSwitchPreset('break')}
+        <button
+          onClick={() => switchPreset({ id: 'break', duration: presets.break })}
           style={{
-            backgroundColor: activePreset.id === 'break' ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: activePreset.id === 'break' ? getTimerColor() : 'transparent',
+            color: activePreset.id === 'break' ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
           }}
         >
-          Break ({presets.break} min)
+          Break ({Math.floor(presets.break / 60)} min)
         </button>
-        
-        <button 
-          onClick={() => handleSwitchPreset('shortBreak')}
+        <button
+          onClick={() => switchPreset({ id: 'shortBreak', duration: presets.shortBreak })}
           style={{
-            backgroundColor: activePreset.id === 'shortBreak' ? getFactionColor() : 'transparent',
-            color: 'white',
-            border: `1px solid ${getFactionColor()}`,
+            backgroundColor: activePreset.id === 'shortBreak' ? getTimerColor() : 'transparent',
+            color: activePreset.id === 'shortBreak' ? 'white' : 'var(--text-primary)',
+            border: `1px solid ${getTimerColor()}`,
             borderRadius: '0.375rem',
             padding: '0.5rem 1rem',
             cursor: 'pointer'
           }}
         >
-          Short Break ({presets.shortBreak} min)
+          Short Break ({Math.floor(presets.shortBreak / 60)} min)
         </button>
       </div>
       
-      {/* Ambient Mode Button */}
+      {/* Battle Power Meter */}
+      <div style={{ 
+        width: '100%',
+        maxWidth: '400px',
+        marginBottom: '2rem',
+        zIndex: 10
+      }}>
+        <div style={{ 
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: '0.5rem'
+        }}>
+          <span style={{ color: 'var(--text-secondary)' }}>Battle Power</span>
+          <span style={{ color: 'var(--text-secondary)' }}>{battlePower}%</span>
+        </div>
+        <div style={{ 
+          width: '100%',
+          height: '8px',
+          backgroundColor: 'var(--bg-secondary)',
+          borderRadius: '4px',
+          overflow: 'hidden'
+        }}>
+          <div style={{ 
+            width: `${battlePower}%`,
+            height: '100%',
+            backgroundColor: getTimerColor(),
+            transition: 'width 0.5s ease'
+          }} />
+        </div>
+      </div>
+      
+      {/* Ambient Mode Toggle */}
       <button
-        onClick={() => setAmbientModeActive(true)}
+        onClick={() => setAmbientModeActive(prev => !prev)}
         style={{
-          marginTop: '2rem',
-          backgroundColor: 'transparent',
-          color: 'white',
-          border: `1px solid ${getFactionColor()}`,
+          backgroundColor: ambientModeActive ? getTimerColor() : 'transparent',
+          color: ambientModeActive ? 'white' : 'var(--text-primary)',
+          border: `1px solid ${getTimerColor()}`,
           borderRadius: '0.375rem',
           padding: '0.5rem 1rem',
           cursor: 'pointer',
+          marginTop: 'auto',
           zIndex: 10
         }}
       >
-        Enter Ambient Mode
+        {ambientModeActive ? 'Exit Ambient Mode' : 'Ambient Mode'}
       </button>
       
       {/* CSS Animations */}
       <style>
         {`
-          @keyframes bounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
+          @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
           }
         `}
       </style>

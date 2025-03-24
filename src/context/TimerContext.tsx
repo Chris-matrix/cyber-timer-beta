@@ -126,8 +126,15 @@ export interface TimerState {
     break: number;
     shortBreak: number;
   };
-  activePreset: TimerPreset;
-  preferences: TimerPreferences;
+  activePreset: {
+    id: string;
+    duration: number;
+  };
+  preferences: {
+    faction: 'autobots' | 'decepticons' | 'maximals' | 'predacons' | 'allspark';
+    soundEnabled: boolean;
+    theme: 'light' | 'dark';
+  };
   stats: TimerStats;
   achievements: TimerAchievement[];
   quotes: TimerQuote[];
@@ -147,13 +154,12 @@ interface TimerContextType {
   startTimer: () => void;
   pauseTimer: () => void;
   resetTimer: () => void;
-  switchPreset: (preset: TimerPreset) => void;
-  updatePreset: (name: keyof TimerState['presets'], value: number) => void;
-  updatePreference: (name: keyof TimerState['preferences'], value: any) => void;
-  resetStats: () => void;
-  showNotification: (title: string, message: string, type: 'success' | 'info' | 'warning' | 'error') => void;
-  unlockQuote: (quoteId: string) => void;
-  unlockAchievement: (achievementId: string) => void;
+  switchPreset: (preset: { id: string; duration: number }) => void;
+  updatePreset: (presetId: string, duration: number) => void;
+  setFaction: (faction: 'autobots' | 'decepticons' | 'maximals' | 'predacons' | 'allspark') => void;
+  toggleSound: () => void;
+  toggleTheme: () => void;
+  dispatch: React.Dispatch<TimerAction>;
 }
 
 // Create context with undefined default value (will be provided by TimerProvider)
@@ -166,26 +172,21 @@ const TimerContext = createContext<TimerContextType | undefined>(undefined);
 const initialState: TimerState = {
   isRunning: false,
   isComplete: false,
-  timeRemaining: 25 * 60,
-  presets: {
-    focus: 25 * 60,
-    shortFocus: 15 * 60,
-    break: 5 * 60,
-    shortBreak: 3 * 60,
-  },
+  timeRemaining: 25 * 60, // 25 minutes in seconds
   activePreset: {
     id: 'focus',
-    duration: 25 * 60,
+    duration: 25 * 60, // 25 minutes in seconds
+  },
+  presets: {
+    focus: 25 * 60, // 25 minutes
+    shortFocus: 15 * 60, // 15 minutes
+    break: 5 * 60, // 5 minutes
+    shortBreak: 2 * 60, // 2 minutes
   },
   preferences: {
-    analyticsView: 'bar',
-    soundEnabled: true,
     faction: 'autobots',
-    character: 'optimus',
-    theme: 'autobots',
-    youtubeUrl: '',
-    quote: 'Freedom is the right of all sentient beings.',
-    randomQuotes: true,
+    soundEnabled: true,
+    theme: 'dark',
   },
   stats: {
     sessionsCompleted: 0,
@@ -290,13 +291,13 @@ const initialState: TimerState = {
  * @returns {TimerContextType} The timer context with state and methods
  * @throws {Error} If used outside of a TimerProvider
  */
-export function useTimer() {
+export const useTimer = () => {
   const context = useContext(TimerContext);
   if (!context) {
     throw new Error('useTimer must be used within a TimerProvider');
   }
   return context;
-}
+};
 
 /**
  * Action types for the timer reducer
@@ -307,13 +308,12 @@ type TimerAction =
   | { type: 'PAUSE_TIMER' }
   | { type: 'RESET_TIMER' }
   | { type: 'TICK' }
-  | { type: 'SWITCH_PRESET'; preset: TimerPreset }
-  | { type: 'UPDATE_PRESET'; name: keyof TimerState['presets']; value: number }
-  | { type: 'UPDATE_PREFERENCE'; name: keyof TimerState['preferences']; value: any }
-  | { type: 'RESET_STATS' }
-  | { type: 'COMPLETE_TIMER_SESSION' }
-  | { type: 'UNLOCK_QUOTE'; quoteId: string }
-  | { type: 'UNLOCK_ACHIEVEMENT'; achievementId: string };
+  | { type: 'SWITCH_PRESET'; preset: { id: string; duration: number } }
+  | { type: 'UPDATE_PRESET'; presetId: string; duration: number }
+  | { type: 'SET_FACTION'; faction: 'autobots' | 'decepticons' | 'maximals' | 'predacons' | 'allspark' }
+  | { type: 'TOGGLE_SOUND' }
+  | { type: 'TOGGLE_THEME' }
+  | { type: 'SET_THEME'; theme: 'light' | 'dark' };
 
 /**
  * Timer reducer function
@@ -326,23 +326,35 @@ type TimerAction =
 function timerReducer(state: TimerState, action: TimerAction): TimerState {
   switch (action.type) {
     case 'START_TIMER':
-      return { ...state, isRunning: true };
+      return {
+        ...state,
+        isRunning: true,
+        isComplete: false,
+      };
     case 'PAUSE_TIMER':
-      return { ...state, isRunning: false };
+      return {
+        ...state,
+        isRunning: false,
+      };
     case 'RESET_TIMER':
       return {
         ...state,
         isRunning: false,
-        isComplete: false,
         timeRemaining: state.activePreset.duration,
+        isComplete: false,
       };
     case 'TICK':
-      const newTimeRemaining = state.timeRemaining - 1;
+      if (state.timeRemaining <= 1) {
+        return {
+          ...state,
+          timeRemaining: 0,
+          isRunning: false,
+          isComplete: true,
+        };
+      }
       return {
         ...state,
-        timeRemaining: newTimeRemaining,
-        isComplete: newTimeRemaining === 0,
-        isRunning: newTimeRemaining > 0,
+        timeRemaining: state.timeRemaining - 1,
       };
     case 'SWITCH_PRESET':
       return {
@@ -357,155 +369,53 @@ function timerReducer(state: TimerState, action: TimerAction): TimerState {
         ...state,
         presets: {
           ...state.presets,
-          [action.name]: action.value,
+          [action.presetId]: action.duration,
         },
-        ...(state.activePreset.id === action.name && {
-          activePreset: {
-            ...state.activePreset,
-            duration: action.value,
-          },
-          timeRemaining: action.value,
-        }),
+        // If the active preset is being updated, also update the time remaining
+        ...(state.activePreset.id === action.presetId
+          ? {
+              activePreset: {
+                ...state.activePreset,
+                duration: action.duration,
+              },
+              timeRemaining: action.duration,
+            }
+          : {}),
       };
-    case 'UPDATE_PREFERENCE':
+    case 'SET_FACTION':
       return {
         ...state,
         preferences: {
           ...state.preferences,
-          [action.name]: action.value,
+          faction: action.faction,
         },
       };
-    case 'RESET_STATS':
+    case 'TOGGLE_SOUND':
       return {
         ...state,
-        stats: {
-          sessionsCompleted: 0,
-          currentStreak: 0,
-          longestStreak: 0,
-          lastSessionDate: undefined,
-          totalFocusTime: 0,
-          weeklyStats: [],
-          monthlyStats: [],
-          yearlyStats: [],
+        preferences: {
+          ...state.preferences,
+          soundEnabled: !state.preferences.soundEnabled,
         },
-        achievements: state.achievements.map(achievement => ({
-          ...achievement,
-          unlocked: false,
-          date: undefined,
-        })),
-        quotes: state.quotes.map((quote, index) => ({
-          ...quote,
-          unlocked: index < 4, // Keep the first 4 quotes unlocked
-        })),
       };
-    case 'COMPLETE_TIMER_SESSION':
-      const today = new Date().toISOString().split('T')[0];
-      const isNewDay = state.stats.lastSessionDate !== today;
-      const isContinuingStreak =
-        state.stats.lastSessionDate &&
-        new Date(state.stats.lastSessionDate).getTime() >=
-          new Date(Date.now() - 24 * 60 * 60 * 1000).getTime();
-      
-      const newStreak = isNewDay
-        ? isContinuingStreak
-          ? state.stats.currentStreak + 1
-          : 1
-        : state.stats.currentStreak;
-      
-      const newLongestStreak = Math.max(state.stats.longestStreak, newStreak);
-      
-      // Check for achievements to unlock
-      let updatedAchievements = [...state.achievements];
-      
-      // First session achievement
-      if (state.stats.sessionsCompleted === 0) {
-        updatedAchievements = updatedAchievements.map(achievement => 
-          achievement.id === 'first-session' 
-            ? { ...achievement, unlocked: true, date: today } 
-            : achievement
-        );
-      }
-      
-      // Streak achievements
-      if (newStreak >= 3) {
-        updatedAchievements = updatedAchievements.map(achievement => 
-          achievement.id === 'three-day-streak' 
-            ? { ...achievement, unlocked: true, date: today } 
-            : achievement
-        );
-      }
-      
-      if (newStreak >= 7) {
-        updatedAchievements = updatedAchievements.map(achievement => 
-          achievement.id === 'seven-day-streak' 
-            ? { ...achievement, unlocked: true, date: today } 
-            : achievement
-        );
-      }
-      
+    case 'TOGGLE_THEME':
       return {
         ...state,
-        stats: {
-          ...state.stats,
-          sessionsCompleted: state.stats.sessionsCompleted + 1,
-          currentStreak: newStreak,
-          longestStreak: newLongestStreak,
-          lastSessionDate: today,
-          totalFocusTime: state.stats.totalFocusTime + state.activePreset.duration,
-          // Update stats entries...
-          weeklyStats: updateStatsEntry(state.stats.weeklyStats, today, state.activePreset.duration),
-          monthlyStats: updateStatsEntry(state.stats.monthlyStats, today, state.activePreset.duration),
-          yearlyStats: updateStatsEntry(state.stats.yearlyStats, today, state.activePreset.duration),
+        preferences: {
+          ...state.preferences,
+          theme: state.preferences.theme === 'light' ? 'dark' : 'light',
         },
-        achievements: updatedAchievements,
       };
-    
-    case 'UNLOCK_QUOTE':
+    case 'SET_THEME':
       return {
         ...state,
-        quotes: state.quotes.map(quote => 
-          quote.id === action.quoteId 
-            ? { ...quote, unlocked: true } 
-            : quote
-        ),
+        preferences: {
+          ...state.preferences,
+          theme: action.theme,
+        },
       };
-    
-    case 'UNLOCK_ACHIEVEMENT':
-      const achievementDate = new Date().toISOString().split('T')[0];
-      return {
-        ...state,
-        achievements: state.achievements.map(achievement => 
-          achievement.id === action.achievementId 
-            ? { ...achievement, unlocked: true, date: achievementDate } 
-            : achievement
-        ),
-      };
-      
     default:
       return state;
-  }
-}
-
-/**
- * Helper function to update statistics entries
- * Either updates an existing entry for the given date or creates a new one
- * 
- * @param {StatEntry[]} entries - Current statistics entries
- * @param {string} date - ISO date string (YYYY-MM-DD)
- * @param {number} duration - Duration in seconds to add to the entry
- * @returns {StatEntry[]} Updated statistics entries
- */
-function updateStatsEntry(entries: StatEntry[], date: string, duration: number): StatEntry[] {
-  const existingEntryIndex = entries.findIndex(entry => entry.date === date);
-  
-  if (existingEntryIndex >= 0) {
-    return entries.map((entry, index) => 
-      index === existingEntryIndex
-        ? { ...entry, sessions: entry.sessions + 1, focusTime: entry.focusTime + duration }
-        : entry
-    );
-  } else {
-    return [...entries, { date, sessions: 1, focusTime: duration }];
   }
 }
 
@@ -525,210 +435,104 @@ function updateStatsEntry(entries: StatEntry[], date: string, duration: number):
  * @param {React.ReactNode} props.children - Child components
  */
 export function TimerProvider({ children }: { children: React.ReactNode }) {
-  const [state, dispatch] = useReducer(timerReducer, initialState, () => {
-    // Load state from localStorage if available
-    const savedState = localStorage.getItem('timerState');
-    if (savedState) {
-      try {
-        const parsedState = JSON.parse(savedState);
-        // Ensure preferences exist with default values if missing
-        if (!parsedState.preferences) {
-          parsedState.preferences = initialState.preferences;
-        } else {
-          // Ensure all preference properties exist
-          parsedState.preferences = {
-            ...initialState.preferences,
-            ...parsedState.preferences
-          };
-        }
-        
-        // Make sure all required state properties exist
-        return {
-          ...initialState,
-          ...parsedState,
-          preferences: parsedState.preferences
-        };
-      } catch (error) {
-        console.error('Failed to parse saved timer state:', error);
-        return initialState;
-      }
-    }
-    return initialState;
-  });
+  const [state, dispatch] = useReducer(timerReducer, initialState);
 
-  /**
-   * Effect to persist state to localStorage whenever it changes
-   * This ensures user data is saved between sessions
-   */
+  // Initialize theme based on system preference
   useEffect(() => {
-    localStorage.setItem('timerState', JSON.stringify(state));
-  }, [state]);
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    dispatch({ type: 'SET_THEME', theme: prefersDark ? 'dark' : 'light' });
+  }, []);
 
-  /**
-   * Effect to handle timer ticks when the timer is running
-   * Sets up an interval that dispatches TICK actions every second
-   */
+  // Apply theme to document
   useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
+    document.documentElement.setAttribute('data-theme', state.preferences.theme);
+  }, [state.preferences.theme]);
 
-    if (state.isRunning) {
-      interval = setInterval(() => {
+  // Timer tick effect - handles countdown when timer is running
+  useEffect(() => {
+    let intervalId: number | undefined;
+    
+    if (state.isRunning && state.timeRemaining > 0) {
+      intervalId = window.setInterval(() => {
         dispatch({ type: 'TICK' });
       }, 1000);
-    } else if (interval) {
-      clearInterval(interval);
     }
-
+    
     return () => {
-      if (interval) clearInterval(interval);
+      if (intervalId) {
+        window.clearInterval(intervalId);
+      }
     };
-  }, [state.isRunning]);
-
-  /**
-   * Effect to handle timer completion
-   * Plays sounds, updates statistics, and potentially unlocks achievements/quotes
-   */
-  useEffect(() => {
-    if (state.isComplete) {
-      if (state.preferences?.soundEnabled) {
-        playNotificationSound('complete', state.preferences.faction as any);
-      }
-      
-      // Only dispatch COMPLETE_TIMER_SESSION if this was a focus session
-      if (state.activePreset.id === 'focus' || state.activePreset.id === 'shortFocus') {
-        dispatch({ type: 'COMPLETE_TIMER_SESSION' });
-        
-        // Show notification
-        showNotification(
-          'Focus Session Complete!', 
-          `Great job! You've completed a ${state.activePreset.duration / 60} minute focus session.`,
-          'success'
-        );
-        
-        // Maybe unlock a random quote if randomQuotes is enabled
-        if (state.preferences?.randomQuotes) {
-          const lockedQuotes = state.quotes.filter(quote => !quote.unlocked);
-          if (lockedQuotes.length > 0) {
-            const randomIndex = Math.floor(Math.random() * lockedQuotes.length);
-            unlockQuote(lockedQuotes[randomIndex].id);
-          }
-        }
-      }
-    }
-  }, [state.isComplete]);
+  }, [state.isRunning, state.timeRemaining]);
 
   /**
    * Starts the timer and plays a sound if enabled
    */
   const startTimer = useCallback(() => {
-    if (state.preferences?.soundEnabled) {
+    if (state.preferences.soundEnabled) {
       playNotificationSound('start', state.preferences.faction as any);
     }
     dispatch({ type: 'START_TIMER' });
-  }, [state.preferences?.soundEnabled, state.preferences?.faction]);
+  }, [state.preferences.soundEnabled, state.preferences.faction]);
 
   /**
    * Pauses the timer and plays a sound if enabled
    */
   const pauseTimer = useCallback(() => {
-    if (state.preferences?.soundEnabled) {
+    if (state.preferences.soundEnabled) {
       playNotificationSound('pause', state.preferences.faction as any);
     }
     dispatch({ type: 'PAUSE_TIMER' });
-  }, [state.preferences?.soundEnabled, state.preferences?.faction]);
+  }, [state.preferences.soundEnabled, state.preferences.faction]);
 
   /**
    * Resets the timer to its initial state and plays a sound if enabled
    */
   const resetTimer = useCallback(() => {
-    if (state.preferences?.soundEnabled) {
+    if (state.preferences.soundEnabled) {
       playNotificationSound('reset', state.preferences.faction as any);
     }
     dispatch({ type: 'RESET_TIMER' });
-  }, [state.preferences?.soundEnabled, state.preferences?.faction]);
+  }, [state.preferences.soundEnabled, state.preferences.faction]);
 
   /**
    * Switches to a different timer preset
    * @param {TimerPreset} preset - The preset to switch to
    */
-  const switchPreset = useCallback((preset: TimerPreset) => {
+  const switchPreset = useCallback((preset: { id: string; duration: number }) => {
     dispatch({ type: 'SWITCH_PRESET', preset });
   }, []);
 
   /**
    * Updates a timer preset duration
-   * @param {string} name - Name of the preset to update
-   * @param {number} value - New duration in seconds
+   * @param {string} presetId - Name of the preset to update
+   * @param {number} duration - New duration in seconds
    */
-  const updatePreset = useCallback((name: keyof TimerState['presets'], value: number) => {
-    dispatch({ type: 'UPDATE_PRESET', name, value });
+  const updatePreset = useCallback((presetId: string, duration: number) => {
+    dispatch({ type: 'UPDATE_PRESET', presetId, duration });
   }, []);
 
   /**
-   * Updates a user preference
-   * @param {string} name - Name of the preference to update
-   * @param {any} value - New preference value
+   * Sets the faction
+   * @param {string} faction - Faction to set
    */
-  const updatePreference = useCallback((name: keyof TimerState['preferences'], value: any) => {
-    dispatch({ type: 'UPDATE_PREFERENCE', name, value });
+  const setFaction = useCallback((faction: 'autobots' | 'decepticons' | 'maximals' | 'predacons' | 'allspark') => {
+    dispatch({ type: 'SET_FACTION', faction });
   }, []);
 
   /**
-   * Resets all user statistics, achievements, and quotes
+   * Toggles sound effects
    */
-  const resetStats = useCallback(() => {
-    dispatch({ type: 'RESET_STATS' });
+  const toggleSound = useCallback(() => {
+    dispatch({ type: 'TOGGLE_SOUND' });
   }, []);
-  
+
   /**
-   * Shows a notification to the user
-   * This is a placeholder that would integrate with a notification system
-   * 
-   * @param {string} title - Notification title
-   * @param {string} message - Notification message
-   * @param {string} type - Notification type (success, info, warning, error)
+   * Toggles the theme
    */
-  const showNotification = useCallback((title: string, message: string, type: 'success' | 'info' | 'warning' | 'error') => {
-    // This function will be implemented with the notification system
-    console.log(`Notification: ${title} - ${message} (${type})`);
-    // In a real implementation, this would dispatch an action to show a notification
+  const toggleTheme = useCallback(() => {
+    dispatch({ type: 'TOGGLE_THEME' });
   }, []);
-  
-  /**
-   * Unlocks a quote and shows a notification
-   * @param {string} quoteId - ID of the quote to unlock
-   */
-  const unlockQuote = useCallback((quoteId: string) => {
-    dispatch({ type: 'UNLOCK_QUOTE', quoteId });
-    
-    // Find the quote to show notification
-    const quote = state.quotes.find(q => q.id === quoteId);
-    if (quote) {
-      showNotification(
-        'New Quote Unlocked!',
-        `"${quote.text}" - ${quote.character}`,
-        'info'
-      );
-    }
-  }, [state.quotes]);
-  
-  /**
-   * Unlocks an achievement and shows a notification
-   * @param {string} achievementId - ID of the achievement to unlock
-   */
-  const unlockAchievement = useCallback((achievementId: string) => {
-    dispatch({ type: 'UNLOCK_ACHIEVEMENT', achievementId });
-    
-    // Find the achievement to show notification
-    const achievement = state.achievements.find(a => a.id === achievementId);
-    if (achievement) {
-      showNotification(
-        'Achievement Unlocked!',
-        `${achievement.name}: ${achievement.description}`,
-        'success'
-      );
-    }
-  }, [state.achievements]);
 
   return (
     <TimerContext.Provider
@@ -739,11 +543,10 @@ export function TimerProvider({ children }: { children: React.ReactNode }) {
         resetTimer,
         switchPreset,
         updatePreset,
-        updatePreference,
-        resetStats,
-        showNotification,
-        unlockQuote,
-        unlockAchievement,
+        setFaction,
+        toggleSound,
+        toggleTheme,
+        dispatch,
       }}
     >
       {children}

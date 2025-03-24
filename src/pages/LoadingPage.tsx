@@ -72,12 +72,10 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
   const [loadingProgress, setLoadingProgress] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [currentQuote, setCurrentQuote] = useState('');
-  const [hasSelectedBefore, setHasSelectedBefore] = useState(false);
 
   // Check if user has already selected a faction and should skip loading screen
   useEffect(() => {
     if (state.preferences.faction && state.preferences.character) {
-      setHasSelectedBefore(true);
       setSelectedFaction(state.preferences.faction as FactionType);
       setSelectedCharacter(state.preferences.character);
       
@@ -87,6 +85,16 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
       }
     }
   }, [state.preferences.faction, state.preferences.character, navigate, isLoading]);
+
+  // Set initial character quote when faction changes
+  useEffect(() => {
+    if (selectedFaction && selectedCharacter) {
+      const character = factionData[selectedFaction].characters.find(c => c.id === selectedCharacter);
+      if (character) {
+        setCurrentQuote(character.quote);
+      }
+    }
+  }, [selectedFaction, selectedCharacter]);
 
   // Handle faction selection
   const handleFactionSelect = (faction: FactionType) => {
@@ -120,16 +128,13 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
     updatePreference('faction', selectedFaction);
     updatePreference('character', selectedCharacter);
     
-    // Find character quote
-    const character = factionData[selectedFaction].characters.find(c => c.id === selectedCharacter);
-    if (character) {
-      setCurrentQuote(character.quote);
-    }
-    
-    // Simulate loading process
+    // Simulate loading process with more realistic progression
     let progress = 0;
     const interval = setInterval(() => {
-      progress += Math.random() * 10;
+      // Create a more realistic loading progression
+      const increment = Math.max(1, Math.floor((100 - progress) / 10));
+      progress += increment;
+      
       if (progress >= 100) {
         progress = 100;
         clearInterval(interval);
@@ -139,7 +144,7 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
           title: 'Welcome to Transformers Timer',
           message: `You've joined the ${factionData[selectedFaction].name}. Ready to focus!`,
           type: 'success',
-          duration: 60000 // 1 minute
+          duration: 5000 // 5 seconds
         });
         
         // Notify parent component that faction has been selected
@@ -153,7 +158,7 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
         }, 1000);
       }
       setLoadingProgress(progress);
-    }, 300);
+    }, 200); // Faster updates for smoother animation
   };
 
   return (
@@ -215,10 +220,14 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginBottom: '1rem',
-                  fontSize: '3rem'
+                  fontSize: '3rem',
+                  backgroundImage: faction.logo ? `url(${faction.logo})` : 'none',
+                  backgroundSize: 'contain',
+                  backgroundPosition: 'center',
+                  backgroundRepeat: 'no-repeat',
+                  boxShadow: `0 0 15px ${faction.color}80`
                 }}>
-                  {/* Placeholder for faction logo */}
-                  {faction.name.charAt(0)}
+                  {!faction.logo && faction.name.charAt(0)}
                 </div>
                 <h3 style={{ 
                   fontSize: '1.5rem', 
@@ -326,17 +335,31 @@ export default function LoadingPage({ onFactionSelected }: LoadingPageProps) {
             backgroundColor: '#2a2a2a',
             borderRadius: '9999px',
             overflow: 'hidden',
-            marginBottom: '2rem'
+            marginBottom: '2rem',
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)'
           }}>
             <div
               style={{
                 height: '100%',
                 width: `${loadingProgress}%`,
                 backgroundColor: factionData[selectedFaction].color,
-                transition: 'width 0.3s ease'
+                transition: 'width 0.3s ease',
+                backgroundImage: `linear-gradient(90deg, ${factionData[selectedFaction].color} 0%, ${factionData[selectedFaction].color}99 50%, ${factionData[selectedFaction].color} 100%)`,
+                backgroundSize: '200% 100%',
+                animation: 'pulse 1.5s infinite linear'
               }}
             />
           </div>
+          
+          <style>
+            {`
+            @keyframes pulse {
+              0% { background-position: 0% 50%; }
+              50% { background-position: 100% 50%; }
+              100% { background-position: 0% 50%; }
+            }
+            `}
+          </style>
           
           <div style={{
             fontSize: '1.5rem',

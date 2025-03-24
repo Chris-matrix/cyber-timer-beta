@@ -28,14 +28,14 @@ export function CircularProgress({
 
   return (
     <div 
+      className={className}
       style={{ 
         position: 'relative', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
         width: `${size}px`, 
-        height: `${size}px`,
-        ...(className ? {} : {})
+        height: `${size}px`
       }}
     >
       <svg
@@ -64,8 +64,8 @@ export function CircularProgress({
             fill: 'none',
             transition: 'stroke-dashoffset 0.5s ease',
             stroke: color,
-            strokeDasharray: circumference,
-            strokeDashoffset: offset,
+            strokeDasharray: `${circumference}`,
+            strokeDashoffset: `${offset}`,
             strokeLinecap: 'round',
           }}
           cx="50"
